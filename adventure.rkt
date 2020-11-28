@@ -294,7 +294,7 @@
      (keycard-owner keycard)))
 )
 
-;; new-keycard: string container -> keycard
+;; new-keycard: string, number, room, container -> keycard
 ;; Makes a new keycard with the specified parameters.
 (define (new-keycard owner access-level privilege location)
   (local [(define keycard (make-keycard '("wildcard") '() location owner access-level privilege))]
