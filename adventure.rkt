@@ -4,6 +4,7 @@
 (require "adventure-define-struct.rkt")
 (require "macros.rkt")
 (require "utilities.rkt")
+(require racket/bool)
 
 ;;;
 ;;; OBJECT
@@ -179,25 +180,33 @@
 ;;;
 
 (define-struct (door thing)
-  ;; destination: container
-  ;; The place this door leads to
-  (destination)
+
+  (;; destination: container
+   ;; The place this door leads to
+   destination
+   ;; lock status: boolean
+   ;; If keycard access control is present
+   lockstatus
+   )
   
   #:methods
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
-    (begin (move! me (door-destination door))
-           (look))))
+    (if (xor (door-lockstatus door) (have-a? (λ (x) (= 2 (keycard-access-level x)))))
+        (display-line "This door seems to be locked.")
+        (begin (move! me (door-destination door))
+           (look)))
+    ))
 
 ;; join: room string room string
 ;; EFFECT: makes a pair of doors with the specified adjectives
 ;; connecting the specified rooms.
-(define (join! room1 adjectives1 room2 adjectives2)
+(define (join! room1 adjectives1 room2 adjectives2 locked?)
   (local [(define r1->r2 (make-door (string->words adjectives1)
-                                    '() room1 room2))
+                                    '() room1 room2 locked?))
           (define r2->r1 (make-door (string->words adjectives2)
-                                    '() room2 room1))]
+                                    '() room2 room1 locked?))]
     (begin (initialize-thing! r1->r2)
            (initialize-thing! r2->r1)
            (void))))
@@ -379,12 +388,12 @@
 ;; Recreate the player object and all the rooms and things.
 (define (start-game)
   ;; Fill this in with the rooms you want
-  (local [(define dorm-room (new-room "dorm room"))
+  (local [(define dorm-room (new-room "dorm"))
           (define dorm-hallway (new-room "hallway"))]
     (begin (set! me (new-person "Tommy Cat" dorm-room))
            ;; Add join commands to connect your rooms with doors
            (join! dorm-room "hallway"
-                  dorm-hallway "dorm room")
+                  dorm-hallway "dorm" #t)
            ;; Add code here to add things to your rooms
            (new-keycard "Charles" 2 dorm-hallway dorm-room)
            (check-containers!)
