@@ -264,12 +264,42 @@
 ;;; ADD YOUR TYPES HERE!
 ;;;
 
+;;;
+;;; KEYCARD
+;;; A prop in game for access control of the doors.
+;;;
+(define-struct (keycard thing)
+  (;; owner: string
+   ;; The original owner of this keycard
+   owner
+   ;; access-level: integer number 0, 1, 2, 3
+   ;; 0 = invalied (no access)
+   ;; 1 = student or faculty (limited access with certain privilege)
+   ;; 2 = admin (full access)
+   access-level
+   ;; privilege: door
+   ;; allows certain doors to be used by keycard with access level 1
+   privilege)
 
+   #:methods
+  ;; change noun to return "Owner's keycard"
+  (define (noun keycard)
+    (string-append
+     "issued to "
+     (keycard-owner keycard)))
+  ;; change examine to return keycard description.
+  (define (examine keycard)
+    (string-append
+     "A purple Wildcard with a picture and a name: "
+     (keycard-owner keycard)))
+)
 
-
-
-
-
+;; new-keycard: string container -> keycard
+;; Makes a new keycard with the specified parameters.
+(define (new-keycard owner access-level privilege location)
+  (local [(define keycard (make-keycard '("wildcard") '() location owner access-level privilege))]
+    (begin (initialize-thing! keycard)
+           keycard)))
 
 ;;;
 ;;; USER COMMANDS
@@ -349,12 +379,14 @@
 ;; Recreate the player object and all the rooms and things.
 (define (start-game)
   ;; Fill this in with the rooms you want
-  (local [(define starting-room (new-room ""))]
-    (begin (set! me (new-person "" starting-room))
+  (local [(define dorm-room (new-room "dorm room"))
+          (define dorm-hallway (new-room "hallway"))]
+    (begin (set! me (new-person "Tommy Cat" dorm-room))
            ;; Add join commands to connect your rooms with doors
-
+           (join! dorm-room "hallway"
+                  dorm-hallway "dorm room")
            ;; Add code here to add things to your rooms
-           
+           (new-keycard "Charles" 2 dorm-hallway dorm-room)
            (check-containers!)
            (void))))
 
@@ -566,4 +598,3 @@
 
 (start-game)
 (look)
-
