@@ -300,7 +300,7 @@
      (keycard-owner keycard)))
 )
 
-;; new-keycard: string, number, room, container -> keycard
+;; new-keycard: string, number, container, container -> keycard
 ;; Makes a new keycard with the specified parameters.
 (define (new-keycard owner access-level privilege location)
   (local [(define adjs (string->words (string-append "wildcard with a name " owner)))
@@ -328,13 +328,44 @@
     "A black secutiry camera. It seems to be off."))
 )
 
-;; new-securitycam: string, number, room, container -> keycard
+;; new-securitycam: string, container, status -> securitycam
 ;; Makes a new keycard with the specified parameters.
 (define (new-securitycam adjectives location status)
   (local [(define adjs (string->words (string-append adjectives " security camera")))
           (define securitycam (make-securitycam adjs '() location status))]
     (begin (initialize-thing! securitycam)
            securitycam)))
+
+;;;
+;;; LAPTOP
+;;; Laptop: allows hacking.
+;;;
+(define-struct (laptop thing)
+  ;; batterylevel: integer number from 0 to 100
+  ;; How much battery is left.
+  (batterylevel)
+
+   #:methods
+  ;; hide the noun.
+  (define (noun laptop)
+    "")
+  ;; change examine to return keycard description.
+  (define (examine laptop)
+    (if (= 0 (laptop-batterylevel laptop))
+    "A Linix laptop with a Northwestern sticker on the front. The battery seems dead."
+    (if (= 100 (laptop-batterylevel laptop))
+    "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged."
+    "A Linix laptop with a Northwestern sticker on the front. There are some battery left."))
+    )
+)
+
+;; new-laptop: string, container, number -> laptop
+;; Makes a laptop with the specified parameters.
+(define (new-laptop adjectives location batterylevel)
+  (local [(define adjs (string->words (string-append adjectives " laptop")))
+          (define laptop (make-laptop adjs '() location batterylevel))]
+    (begin (initialize-thing! laptop)
+           laptop)))
 
 ;;;
 ;;; USER COMMANDS
@@ -423,6 +454,7 @@
            ;; Add code here to add things to your rooms
            (new-keycard "Charles" 2 dorm-hallway dorm-room)
            (new-keycard "Tommy" 1 dorm-hallway me)
+           (new-laptop "silver Banana Pro" dorm-room 97)
            (new-securitycam "black" dorm-hallway #t)
            (check-containers!)
            (void))))
