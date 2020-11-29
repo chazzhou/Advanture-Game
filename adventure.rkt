@@ -79,7 +79,7 @@
   (define (remove! container thing)
     (set-container-contents! container
                              (remove thing
-                                     (container-contents container))))
+                                     (container-contents container)))))
   
   ;; add!: container thing -> void
   ;; EFFECT: adds the thing to the container.  Does not update the thing's location.
@@ -95,8 +95,14 @@
              (if (empty? other-stuff)
                  (printf "There's nothing here.~%")
                  (begin (printf "You see:~%")
-                        (for-each print-description other-stuff))))
-           (void))))
+                        (for-each print-description (filter (lambda (x)
+                                                              (if (door? x)
+                                                                  (not (door-invisible? x))
+                                                                  true))
+
+
+                                                                  other-stuff)))))
+           (void))) 
 
 ;; move!: thing container -> void
 ;; Moves thing from its previous location to container.
@@ -131,7 +137,7 @@
 
 ;; new-room: string -> room
 ;; Makes a new room with the specified adjectives
-(define (new-room adjectives)
+ (define (new-room adjectives)
   (make-room (string->words adjectives)
              '()))
 
@@ -181,23 +187,27 @@
 (define-struct (door thing)
   ;; destination: container
   ;; The place this door leads to
-  (destination)
+  (destination
+   invisible?)
   
   #:methods
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
     (begin (move! me (door-destination door))
-           (look))))
+           (unless (storage? (door-destination door))
+             (look)))))
 
 ;; join: room string room string
 ;; EFFECT: makes a pair of doors with the specified adjectives
 ;; connecting the specified rooms.
-(define (join! room1 adjectives1 room2 adjectives2)
+(define (join! room1 adjectives1 bool1 room2 adjectives2 bool2)
   (local [(define r1->r2 (make-door (string->words adjectives1)
-                                    '() room1 room2))
+                                    '() room1 room2
+                                    bool1))
           (define r2->r1 (make-door (string->words adjectives2)
-                                    '() room2 room1))]
+                                    '() room2 room1
+                                    bool2))]
     (begin (initialize-thing! r1->r2)
            (initialize-thing! r2->r1)
            (void))))
@@ -208,7 +218,10 @@
 ;;;
 
 (define-struct (person thing)
-  ())
+  (;; hunger: person's hunger level
+   hunger
+   ;; thirst: how thirsty the person is
+   thirst))
 
 ;; initialize-person: person -> void
 ;; EFFECT: do whatever initializations are necessary for persons.
@@ -221,7 +234,9 @@
   (local [(define person
             (make-person (string->words adjectives)
                          '()
-                         location))]
+                         location
+                         20
+                         20))]
     (begin (initialize-person! person)
            person)))
 
@@ -266,6 +281,79 @@
 
 
 
+(define-struct (food prop)
+  (satiety)
+  #:methods
+  (define (eat food)
+    (begin
+      (destroy! food)
+      (display-line "tasty!")
+      (set-person-hunger! me (-
+                             (person-hunger me)
+                             (food-satiety food)))
+    (display-line (string-append "your hunger level is "
+                                   (number->string (person-hunger me)))))))
+
+(define (new-food description location examine-text satiety)
+  (local [(define words (string->words description))
+          (define noun (last words))
+          (define adjectives (drop-right words 1))
+          (define food (make-food adjectives '() location noun examine-text satiety))]
+    (begin (initialize-thing! food)
+           food)))
+
+(define-struct (beverage prop)
+  (satiety)
+  #:methods
+  (define (drink o)
+    (begin
+      (destroy! o)
+      (display-line "mmm, thirst-quenching!")
+      (set-person-thirst! me (-
+                              (person-thirst me)
+                              (beverage-satiety o)))
+      (display-line (string-append "your thirst level is "
+                                   (number->string (person-thirst me)))))))
+
+(define (new-beverage description location examine-text satiety)
+  (local [(define words (string->words description))
+          (define noun (last words))
+          (define adjectives (drop-right words 1))
+          (define beverage (make-beverage adjectives '() location noun examine-text satiety))]
+    (begin (initialize-thing! beverage)
+           beverage)))
+
+
+
+(define-struct (storage prop)
+  ()
+
+  #:methods
+  (define (open storage)
+    (begin      
+      (describe-contents storage)
+      (join! (thing-location me) "a" true
+             storage "b" true)
+      (go (the a door)))))
+
+(define (new-storage description contents location examine-text)
+  (local [(define words (string->words description))
+          (define noun (last words))
+          (define adjectives (drop-right words 1))
+          (define storage (make-storage adjectives contents location noun examine-text))]
+    (begin (initialize-thing! storage)
+           storage)))
+
+(define-struct (flyer prop)
+  (text)
+
+  #:methods
+  (define (read flyer)
+    (flyer-text flyer)))
+      
+    
+
+
 
 
 
@@ -296,7 +384,8 @@
   "Takes a closer look at the thing")
 
 (define (take thing)
-  (move! thing me))
+  (begin
+    (move! thing me)))
 
 (define-user-command (take thing)
   "Moves thing to your inventory")
@@ -341,6 +430,21 @@
 ;;; ADD YOUR COMMANDS HERE!
 ;;;
 
+;; check-hunger: displays player's hunger level
+(define (check-hunger)
+  (person-hunger me))
+
+;; check-thirst: displays player's thirst level
+(define (check-thirst)
+  (person-thirst me))
+
+(define (close)
+    (begin
+      (go (the b door))))
+
+    
+
+
 ;;;
 ;;; THE GAME WORLD - FILL ME IN
 ;;;
@@ -349,11 +453,24 @@
 ;; Recreate the player object and all the rooms and things.
 (define (start-game)
   ;; Fill this in with the rooms you want
-  (local [(define starting-room (new-room ""))]
+  (local [(define starting-room (new-room "small cold"))]
     (begin (set! me (new-person "" starting-room))
            ;; Add join commands to connect your rooms with doors
 
            ;; Add code here to add things to your rooms
+           (new-food "apple" starting-room "apple" 15)
+           (new-storage "old treasure chest"                        
+                        '()                            
+                        starting-room
+                        "it is an old treasure chest, cool")
+           (new-food "ripe yellow banana"
+                     (the storage)
+                     "it is a ripe yellow banana"
+                     10)
+           (new-beverage "cold glass of water"
+                         starting-room
+                         "it is a cold glass of water"
+                         15)
            
            (check-containers!)
            (void))))
