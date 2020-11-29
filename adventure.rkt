@@ -275,7 +275,7 @@
 
 ;;;
 ;;; KEYCARD
-;;; A prop in game for access control of the doors.
+;;; A thing in game for access control of the doors.
 ;;;
 (define-struct (keycard thing)
   (;; owner: string
@@ -291,13 +291,10 @@
    privilege)
 
    #:methods
-  ;; change noun to return "Owner's keycard"
-  (define (noun keycard)
-    (string-append
-     "issued to "
-     (keycard-owner keycard)))
-  ;; change examine to return keycard description.
-  (define (examine keycard)
+   ;; hide the noun.
+   (define (noun keycard) "")
+   ;; change examine to return keycard description.
+   (define (examine keycard)
     (string-append
      "A purple Wildcard with a picture and a name: "
      (keycard-owner keycard)))
@@ -306,9 +303,38 @@
 ;; new-keycard: string, number, room, container -> keycard
 ;; Makes a new keycard with the specified parameters.
 (define (new-keycard owner access-level privilege location)
-  (local [(define keycard (make-keycard '("wildcard") '() location owner access-level privilege))]
+  (local [(define adjs (string->words (string-append "wildcard with a name " owner)))
+          (define keycard (make-keycard adjs '() location owner access-level privilege))]
     (begin (initialize-thing! keycard)
            keycard)))
+
+;;;
+;;; SECURITYCAM
+;;; A thing in game for checking if the user is in a room. Can trigger a losing scenario.
+;;;
+(define-struct (securitycam thing)
+  ;; status: boolean
+  ;; The on and off status of the cam
+  (status)
+
+   #:methods
+  ;; hide the noun.
+  (define (noun securitycam)
+    "")
+  ;; change examine to return keycard description.
+  (define (examine securitycam)
+    (if (securitycam-status securitycam)
+    "A black security camera that is blinking red light."
+    "A black secutiry camera. It seems to be off."))
+)
+
+;; new-securitycam: string, number, room, container -> keycard
+;; Makes a new keycard with the specified parameters.
+(define (new-securitycam adjectives location status)
+  (local [(define adjs (string->words (string-append adjectives " security camera")))
+          (define securitycam (make-securitycam adjs '() location status))]
+    (begin (initialize-thing! securitycam)
+           securitycam)))
 
 ;;;
 ;;; USER COMMANDS
@@ -396,6 +422,8 @@
                   dorm-hallway "dorm" #t)
            ;; Add code here to add things to your rooms
            (new-keycard "Charles" 2 dorm-hallway dorm-room)
+           (new-keycard "Tommy" 1 dorm-hallway me)
+           (new-securitycam "black" dorm-hallway #t)
            (check-containers!)
            (void))))
 
