@@ -193,7 +193,7 @@
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
-    (if (xor (door-lockstatus door) (have-a? (λ (x) (= 2 (keycard-access-level x)))))
+    (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
         (display-line "This door seems to be locked.")
         (begin (move! me (door-destination door))
            (look)))
@@ -325,7 +325,7 @@
   (define (examine securitycam)
     (if (securitycam-status securitycam)
     "A black security camera that is blinking red light."
-    "A black secutiry camera. It seems to be off."))
+    "A black security camera. It seems to be off."))
 )
 
 ;; new-securitycam: string, container, status -> securitycam
@@ -378,6 +378,8 @@
          (void)))
 
 (define-user-command (look) "Prints what you can see in the room")
+
+(define-user-command (hack thing) "try to hack the thing")
 
 (define (inventory)
   (if (empty? (my-inventory))
@@ -437,6 +439,26 @@
 ;;; ADD YOUR COMMANDS HERE!
 ;;;
 
+;; hack: securitycam -> void
+;; Change the status of the camera.
+(define (hack securitycam)
+  (if (have-a? laptop?)
+      (if (ormap (λ (x) (> (laptop-batterylevel x) 0)) (filter laptop? (my-inventory)))
+      (if (securitycam? securitycam)
+          (begin (set-securitycam-status! securitycam #f)
+                 (display-line "#     #    #     #####  #    # ####### ######  ### ")
+                 (display-line "#     #   # #   #     # #   #  #       #     # ### ")
+                 (display-line "#     #  #   #  #       #  #   #       #     # ### ")
+                 (display-line "####### #     # #       ###    #####   #     #  #  ")
+                 (display-line "#     # ####### #       #  #   #       #     #     ")
+                 (display-line "#     # #     # #     # #   #  #       #     # ### ")
+                 (display-line "#     # #     #  #####  #    # ####### ######  ### ")
+                 )
+          (display-line "You are not sure how to hack that."))
+      (display-line "You realized that your laptop is out of battery."))
+      (display-line "You don't have a a device that you can use to hack things with."))
+  )
+
 ;;;
 ;;; THE GAME WORLD - FILL ME IN
 ;;;
@@ -454,7 +476,7 @@
            ;; Add code here to add things to your rooms
            (new-keycard "Charles" 2 dorm-hallway dorm-room)
            (new-keycard "Tommy" 1 dorm-hallway me)
-           (new-laptop "silver Banana Pro" dorm-room 97)
+           (new-laptop "silver Banana Pro" dorm-room 1)
            (new-securitycam "black" dorm-hallway #t)
            (check-containers!)
            (void))))
