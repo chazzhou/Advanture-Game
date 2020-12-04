@@ -4,6 +4,7 @@
 (require "adventure-define-struct.rkt")
 (require "macros.rkt")
 (require "utilities.rkt")
+(require racket/bool)
 
 ;;;
 ;;; OBJECT
@@ -192,25 +193,43 @@
 ;;;
 
 (define-struct (door thing)
-  ;; destination: container
-  ;; The place this door leads to
-  (destination)
+
+  (;; destination: container
+   ;; The place this door leads to
+   destination
+   ;; lock status: boolean
+   ;; If keycard access control is present
+   lockstatus
+   )
   
   #:methods
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
+
     (begin (move! me (door-destination door))
              (look))))
+    (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
+        (display-line "This door seems to be locked.")
+        (begin (move! me (door-destination door))
+           (look)))
+    ))
+
 
 ;; join: room string room string
 ;; EFFECT: makes a pair of doors with the specified adjectives
 ;; connecting the specified rooms.
-(define (join! room1 adjectives1 room2 adjectives2)
+(define (join! room1 adjectives1 room2 adjectives2 locked?)
   (local [(define r1->r2 (make-door (string->words adjectives1)
+
                                     '() room1 false room2))
           (define r2->r1 (make-door (string->words adjectives2)
                                     '() room2 false room1))]
+
+                                    '() room1 room2 locked?))
+          (define r2->r1 (make-door (string->words adjectives2)
+                                    '() room2 room1 locked?))]
+
     (begin (initialize-thing! r1->r2)
            (initialize-thing! r2->r1)
            (void))))
@@ -290,6 +309,68 @@
 ;;; ADD YOUR TYPES HERE!
 ;;;
 
+;;;
+;;; KEYCARD
+;;; A thing in game for access control of the doors.
+;;;
+(define-struct (keycard thing)
+  (;; owner: string
+   ;; The original owner of this keycard
+   owner
+   ;; access-level: integer number 0, 1, 2, 3
+   ;; 0 = invalied (no access)
+   ;; 1 = student or faculty (limited access with certain privilege)
+   ;; 2 = admin (full access)
+   access-level
+   ;; privilege: door
+   ;; allows certain doors to be used by keycard with access level 1
+   privilege)
+
+   #:methods
+   ;; hide the noun.
+   (define (noun keycard) "")
+   ;; change examine to return keycard description.
+   (define (examine keycard)
+    (string-append
+     "A purple Wildcard with a picture and a name: "
+     (keycard-owner keycard)))
+)
+
+;; new-keycard: string, number, container, container -> keycard
+;; Makes a new keycard with the specified parameters.
+(define (new-keycard owner access-level privilege location)
+  (local [(define adjs (string->words (string-append "wildcard with a name " owner)))
+          (define keycard (make-keycard adjs '() location owner access-level privilege))]
+    (begin (initialize-thing! keycard)
+           keycard)))
+
+;;;
+;;; SECURITYCAM
+;;; A thing in game for checking if the user is in a room. Can trigger a losing scenario.
+;;;
+(define-struct (securitycam thing)
+  ;; status: boolean
+  ;; The on and off status of the cam
+  (status)
+
+   #:methods
+  ;; hide the noun.
+  (define (noun securitycam)
+    "")
+  ;; change examine to return keycard description.
+  (define (examine securitycam)
+    (if (securitycam-status securitycam)
+    "A black security camera that is blinking red light."
+    "A black security camera. It seems to be off."))
+)
+
+;; new-securitycam: string, container, status -> securitycam
+;; Makes a new keycard with the specified parameters.
+(define (new-securitycam adjectives location status)
+  (local [(define adjs (string->words (string-append adjectives " security camera")))
+          (define securitycam (make-securitycam adjs '() location status))]
+    (begin (initialize-thing! securitycam)
+           securitycam)))
 
 
 (define-struct (food prop)
@@ -399,9 +480,87 @@
 
 
 
+;;;
+;;; LAPTOP
+;;; Laptop: allows hacking.
+;;;
+(define-struct (laptop thing)
+  ;; batterylevel: integer number from 0 to 100
+  ;; How much battery is left.
+  (batterylevel)
+
+   #:methods
+  ;; hide the noun.
+  (define (noun laptop)
+    "")
+  ;; change examine to return keycard description.
+  (define (examine laptop)
+    (if (= 0 (laptop-batterylevel laptop))
+    "A Linix laptop with a Northwestern sticker on the front. The battery seems dead."
+    (if (= 100 (laptop-batterylevel laptop))
+    "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged."
+    "A Linix laptop with a Northwestern sticker on the front. There are some battery left."))
+    )
+)
+
+;; new-laptop: string, container, number -> laptop
+;; Makes a laptop with the specified parameters.
+(define (new-laptop adjectives location batterylevel)
+  (local [(define adjs (string->words (string-append adjectives " laptop")))
+          (define laptop (make-laptop adjs '() location batterylevel))]
+    (begin (initialize-thing! laptop)
+           laptop)))
 
 
+;;;
+;;; LAPTOPCHARGER
+;;; Laptop Charger: allows charging.
+;;;
+(define-struct (laptopcharger thing)
+  ()
 
+   #:methods
+  ;; hide the noun.
+  (define (noun laptopcharger)
+    "")
+  ;; change examine to return keycard description.
+  (define (examine laptopcharger)
+    "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A."
+    )
+)
+
+;; new-laptopcharger: string, container, number -> laptopcharger
+;; Makes a laptop with the specified parameters.
+(define (new-laptopcharger adjectives location)
+  (local [(define adjs (string->words (string-append adjectives " laptop charger")))
+          (define laptopcharger (make-laptopcharger adjs '() location))]
+    (begin (initialize-thing! laptopcharger)
+           laptopcharger)))
+
+;;;
+;;; POWEROUTLET
+;;; Power Outlet: allows charging.
+;;;
+(define-struct (poweroutlet thing)
+  ()
+
+   #:methods
+  ;; hide the noun.
+  (define (noun laptopcharger)
+    "power outlet")
+  ;; change examine to return keycard description.
+  (define (examine laptop)
+    "A standard two ports power outlet. AC 110V 10A."
+    )
+)
+
+;; new-poweroutlet: string, container, number -> poweroutlet
+;; Makes a power outlet with the specified parameters.
+(define (new-poweroutlet adjectives location)
+  (local [(define adjs (string->words (string-append adjectives)))
+          (define poweroutlet (make-poweroutlet adjs '() location))]
+    (begin (initialize-thing! poweroutlet)
+           poweroutlet)))
 
 ;;;
 ;;; USER COMMANDS
@@ -414,6 +573,8 @@
          (void)))
 
 (define-user-command (look) "Prints what you can see in the room")
+
+(define-user-command (hack thing) "try to hack the thing")
 
 (define (inventory)
   (if (empty? (my-inventory))
@@ -476,6 +637,7 @@
 ;;; ADD YOUR COMMANDS HERE!
 ;;;
 
+
 ;; check-hunger: displays player's hunger level
 (define (check-hunger)
   (person-hunger me))
@@ -522,7 +684,38 @@
 
 
 
-    
+   
+
+;; hack: securitycam -> void
+;; Change the status of the camera.
+(define (hack securitycam)
+  (if (have-a? laptop?)
+      (if (ormap (λ (x) (> (laptop-batterylevel x) 0)) (filter laptop? (my-inventory)))
+      (if (securitycam? securitycam)
+          (begin (set-securitycam-status! securitycam #f)
+                 (display-line "#     #    #     #####  #    # ####### ######  ### ")
+                 (display-line "#     #   # #   #     # #   #  #       #     # ### ")
+                 (display-line "#     #  #   #  #       #  #   #       #     # ### ")
+                 (display-line "####### #     # #       ###    #####   #     #  #  ")
+                 (display-line "#     # ####### #       #  #   #       #     #     ")
+                 (display-line "#     # #     # #     # #   #  #       #     # ### ")
+                 (display-line "#     # #     #  #####  #    # ####### ######  ### ")
+                 )
+          (display-line "You are not sure how to hack that."))
+      (display-line "You realized that your laptop is out of battery."))
+      (display-line "You don't have a a device that you can use to hack things with."))
+  )
+
+;; charge: -> void
+;; Charge the laptop if a charger is present.
+(define (charge)
+  (if (have-a? laptopcharger?)
+      (if (have-a-in-room? poweroutlet?)
+          (begin (set-laptop-batterylevel! (the laptop) 100)
+                 (display-line "Battery charged."))
+          (display-line "There's no power outlet nearby."))
+      (display-line "You don't know how to charge your laptop without a charger."))
+)
 
 
 ;;;
@@ -533,11 +726,19 @@
 ;; Recreate the player object and all the rooms and things.
 (define (start-game)
   ;; Fill this in with the rooms you want
+
   (local [(define starting-room (new-room "small cold"))]
     (begin (set! me (new-person "" starting-room))
-           ;; Add join commands to connect your rooms with doors
 
+  (local [(define dorm-room (new-room "dorm"))
+          (define dorm-hallway (new-room "hallway"))]
+    (begin (set! me (new-person "Tommy Cat" dorm-room))
+
+           ;; Add join commands to connect your rooms with doors
+           (join! dorm-room "hallway"
+                  dorm-hallway "dorm" #t)
            ;; Add code here to add things to your rooms
+
            (new-food "apple" starting-room "apple" 15)
            (new-food "pie" starting-room "pie" 40)
            (new-storage "old treasure chest"                                                    
@@ -568,6 +769,13 @@
                      "What was this doing in an apple?"
                      (the apple))
            
+
+           (new-keycard "Charles" 2 dorm-hallway dorm-room)
+           (new-keycard "Tommy" 1 dorm-hallway me)
+           (new-laptop "silver Banana Pro" dorm-room 1)
+           (new-securitycam "black" dorm-hallway #t)
+           (new-laptopcharger "black" me)
+           (new-poweroutlet "white" dorm-room)
            (check-containers!)
            (void))))
 
@@ -620,6 +828,12 @@
 (define (have-a? predicate)
   (ormap predicate
          (container-accessible-contents me)))
+
+;; have-a-in-room?: predicate -> boolean
+;; True if the player as something satisfying predicate in their pocket or the room.
+(define (have-a-in-room? predicate)
+  (ormap predicate
+         (stuff-here-except-me)))
 
 ;; find-the: (listof string) -> object
 ;; Returns the object from (accessible-objects)
@@ -779,4 +993,3 @@
 
 (start-game)
 (look)
-
