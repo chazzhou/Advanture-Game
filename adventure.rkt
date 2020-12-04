@@ -323,9 +323,9 @@
    (define (noun keycard) "")
    ;; change examine to return keycard description.
    (define (examine keycard)
-    (string-append
+    (display-line (string-append
      "A purple Wildcard with a picture and a name: "
-     (keycard-owner keycard)))
+     (keycard-owner keycard))))
 )
 
 ;; new-keycard: string, number, container, container -> keycard
@@ -352,8 +352,8 @@
   ;; change examine to return keycard description.
   (define (examine securitycam)
     (if (securitycam-status securitycam)
-    "A black security camera that is blinking red light."
-    "A black security camera. It seems to be off."))
+    (display-line "A black security camera that is blinking red light.")
+    (display-line "A black security camera. It seems to be off.")))
 )
 
 ;; new-securitycam: string, container, status -> securitycam
@@ -488,10 +488,10 @@
   ;; change examine to return keycard description.
   (define (examine laptop)
     (if (= 0 (laptop-batterylevel laptop))
-    "A Linix laptop with a Northwestern sticker on the front. The battery seems dead."
+    (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems dead.")
     (if (= 100 (laptop-batterylevel laptop))
-    "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged."
-    "A Linix laptop with a Northwestern sticker on the front. There are some battery left."))
+    (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged.")
+    (display-line "A Linix laptop with a Northwestern sticker on the front. There are some battery left.")))
     )
 )
 
@@ -517,7 +517,7 @@
     "")
   ;; change examine to return keycard description.
   (define (examine laptopcharger)
-    "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A."
+    (display-line "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A.")
     )
 )
 
@@ -539,17 +539,17 @@
    #:methods
   ;; hide the noun.
   (define (noun laptopcharger)
-    "power outlet")
+    "")
   ;; change examine to return keycard description.
   (define (examine laptop)
-    "A standard two ports power outlet. AC 110V 10A."
+    (display-line "A standard two ports power outlet. AC 110V 10A.")
     )
 )
 
 ;; new-poweroutlet: string, container, number -> poweroutlet
 ;; Makes a power outlet with the specified parameters.
 (define (new-poweroutlet adjectives location)
-  (local [(define adjs (string->words (string-append adjectives)))
+  (local [(define adjs (string->words (string-append adjectives " power outlet")))
           (define poweroutlet (make-poweroutlet adjs '() location #false))]
     (begin (initialize-thing! poweroutlet)
            poweroutlet)))
