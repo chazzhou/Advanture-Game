@@ -323,9 +323,9 @@
    (define (noun keycard) "")
    ;; change examine to return keycard description.
    (define (examine keycard)
-    (display-line (string-append
+    (string-append
      "A purple Wildcard with a picture and a name: "
-     (keycard-owner keycard))))
+     (keycard-owner keycard)))
 )
 
 ;; new-keycard: string, number, container, container -> keycard
@@ -352,8 +352,8 @@
   ;; change examine to return keycard description.
   (define (examine securitycam)
     (if (securitycam-status securitycam)
-    (display-line "A black security camera that is blinking red light.")
-    (display-line "A black security camera. It seems to be off.")))
+    "A black security camera that is blinking red light."
+    "A black security camera. It seems to be off."))
 )
 
 ;; new-securitycam: string, container, status -> securitycam
@@ -370,10 +370,7 @@
   #:methods
   (define (eat food)
     (if (not (empty? (container-contents food)))
-        (begin
-          (display-line (string-append "Wow! there's " (description (first (container-contents food))) " in here!"))
-          (move! (first (container-contents food)) me)
-          (display-line (string-append "You took" (description (last (container-contents me))) ". Your hunger level stays the same.")))
+        (display-line (string-append "Wow! there's " (description (first (container-contents food))) " in here!"))
         (if (< (person-hunger me) 1)
             (display-line "You're not hungry anymore.")
             (begin
@@ -491,10 +488,10 @@
   ;; change examine to return keycard description.
   (define (examine laptop)
     (if (= 0 (laptop-batterylevel laptop))
-    (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems dead.")
+    "A Linix laptop with a Northwestern sticker on the front. The battery seems dead."
     (if (= 100 (laptop-batterylevel laptop))
-    (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged.")
-    (display-line "A Linix laptop with a Northwestern sticker on the front. There are some battery left.")))
+    "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged."
+    "A Linix laptop with a Northwestern sticker on the front. There are some battery left."))
     )
 )
 
@@ -520,7 +517,7 @@
     "")
   ;; change examine to return keycard description.
   (define (examine laptopcharger)
-    (display-line "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A.")
+    "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A."
     )
 )
 
@@ -542,17 +539,17 @@
    #:methods
   ;; hide the noun.
   (define (noun laptopcharger)
-    "")
+    "power outlet")
   ;; change examine to return keycard description.
   (define (examine laptop)
-    (display-line "A standard two ports power outlet. AC 110V 10A.")
+    "A standard two ports power outlet. AC 110V 10A."
     )
 )
 
 ;; new-poweroutlet: string, container, number -> poweroutlet
 ;; Makes a power outlet with the specified parameters.
 (define (new-poweroutlet adjectives location)
-  (local [(define adjs (string->words (string-append adjectives " power outlet")))
+  (local [(define adjs (string->words (string-append adjectives)))
           (define poweroutlet (make-poweroutlet adjs '() location #false))]
     (begin (initialize-thing! poweroutlet)
            poweroutlet)))
@@ -649,9 +646,7 @@
 
 (define (close)
   (if (storage? (thing-location me))
-      (begin
-        (display-line (string-append "You closed the " (description (thing-location me))))
-        (move! me (thing-location (thing-location me))))
+      (move! me (thing-location (thing-location me)))
       (display-line "You haven't opened a storage object.")))
 
 (define-user-command (open storage)
