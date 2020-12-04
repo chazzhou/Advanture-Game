@@ -206,11 +206,12 @@
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
-    (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
+    (begin
+      (update-stats)
+      (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
         (display-line "This door seems to be locked.")
         (begin (move! me (door-destination door))
-           (look)))
-    ))
+           (look))))))
 
 
 ;; join: room string room string
@@ -430,7 +431,8 @@
 
   #:methods
   (define (open storage)
-    (begin      
+    (begin
+      (update-stats)
       (describe-contents storage)
       (move! me (the storage))
       (newline)
@@ -584,10 +586,12 @@
   "Takes a closer look at the thing")
 
 (define (take thing)
-  (if (thing-takable? thing)
+  (begin
+    (update-stats)
+    (if (thing-takable? thing)
       (begin
         (move! thing me))
-      (display-line "You can't take that.")))
+      (display-line "You can't take that."))))
 
 (define-user-command (take thing)
   "Moves thing to your inventory")
@@ -793,6 +797,18 @@
       )
   )
 
+
+;; update-stats: updates a player's hunger and thirst when an action is performed
+(define (update-stats)
+  (begin
+    (if (> (person-hunger me) 0)
+        (set-person-hunger! me (- (person-hunger me) 1))
+        (error "You died of hunger."))
+    (if (> (person-hunger me) 0)
+        (set-person-thirst! me (- (person-thirst me) 1))
+        (go (the door))
+        (error "You died of thirst."))))
+    
 ;; here: -> container
 ;; The current room the player is in
 (define (here)
