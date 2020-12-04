@@ -784,6 +784,15 @@
 ;;; UTILITIES
 ;;;
 
+;; bargraph: number -> string
+;; Outputs a string as a hunger/thirst bar.
+(define (bargraph value)
+  (if (or (< value 0) (> value 20))
+      (error "Illegal value")
+      (display-line (list->string (append (make-list value #\■) (make-list (- 20 value) #\□))))
+      )
+  )
+
 ;; here: -> container
 ;; The current room the player is in
 (define (here)
