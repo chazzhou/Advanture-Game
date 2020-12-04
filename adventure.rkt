@@ -206,16 +206,9 @@
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
-<<<<<<< Updated upstream
-
-    (begin (move! me (door-destination door))
-             (look))))
-    (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
-=======
     (begin
       (update-stats)
       (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
->>>>>>> Stashed changes
         (display-line "This door seems to be locked.")
         (begin (move! me (door-destination door))
            (look))))))
@@ -226,14 +219,9 @@
 ;; connecting the specified rooms.
 (define (join! room1 adjectives1 room2 adjectives2 locked?)
   (local [(define r1->r2 (make-door (string->words adjectives1)
-
-                                    '() room1 false room2))
+                                    '() room1 #false room2 locked?))
           (define r2->r1 (make-door (string->words adjectives2)
-                                    '() room2 false room1))]
-
-                                    '() room1 room2 locked?))
-          (define r2->r1 (make-door (string->words adjectives2)
-                                    '() room2 room1 locked?))]
+                                    '() room2 #false room1 locked?))]
 
     (begin (initialize-thing! r1->r2)
            (initialize-thing! r2->r1)
@@ -336,16 +324,16 @@
    (define (noun keycard) "")
    ;; change examine to return keycard description.
    (define (examine keycard)
-    (string-append
+    (display-line (string-append
      "A purple Wildcard with a picture and a name: "
-     (keycard-owner keycard)))
+     (keycard-owner keycard))))
 )
 
 ;; new-keycard: string, number, container, container -> keycard
 ;; Makes a new keycard with the specified parameters.
 (define (new-keycard owner access-level privilege location)
   (local [(define adjs (string->words (string-append "wildcard with a name " owner)))
-          (define keycard (make-keycard adjs '() location owner access-level privilege))]
+          (define keycard (make-keycard adjs '() location #true owner access-level privilege))]
     (begin (initialize-thing! keycard)
            keycard)))
 
@@ -365,15 +353,15 @@
   ;; change examine to return keycard description.
   (define (examine securitycam)
     (if (securitycam-status securitycam)
-    "A black security camera that is blinking red light."
-    "A black security camera. It seems to be off."))
+    (display-line "A black security camera that is blinking red light.")
+    (display-line "A black security camera. It seems to be off.")))
 )
 
 ;; new-securitycam: string, container, status -> securitycam
 ;; Makes a new keycard with the specified parameters.
 (define (new-securitycam adjectives location status)
   (local [(define adjs (string->words (string-append adjectives " security camera")))
-          (define securitycam (make-securitycam adjs '() location status))]
+          (define securitycam (make-securitycam adjs '() location #false status))]
     (begin (initialize-thing! securitycam)
            securitycam)))
 
@@ -505,10 +493,10 @@
   ;; change examine to return keycard description.
   (define (examine laptop)
     (if (= 0 (laptop-batterylevel laptop))
-    "A Linix laptop with a Northwestern sticker on the front. The battery seems dead."
+    (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems dead.")
     (if (= 100 (laptop-batterylevel laptop))
-    "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged."
-    "A Linix laptop with a Northwestern sticker on the front. There are some battery left."))
+    (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged.")
+    (display-line "A Linix laptop with a Northwestern sticker on the front. There are some battery left.")))
     )
 )
 
@@ -516,7 +504,7 @@
 ;; Makes a laptop with the specified parameters.
 (define (new-laptop adjectives location batterylevel)
   (local [(define adjs (string->words (string-append adjectives " laptop")))
-          (define laptop (make-laptop adjs '() location batterylevel))]
+          (define laptop (make-laptop adjs '() location #true batterylevel))]
     (begin (initialize-thing! laptop)
            laptop)))
 
@@ -534,7 +522,7 @@
     "")
   ;; change examine to return keycard description.
   (define (examine laptopcharger)
-    "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A."
+    (display-line "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A.")
     )
 )
 
@@ -542,7 +530,7 @@
 ;; Makes a laptop with the specified parameters.
 (define (new-laptopcharger adjectives location)
   (local [(define adjs (string->words (string-append adjectives " laptop charger")))
-          (define laptopcharger (make-laptopcharger adjs '() location))]
+          (define laptopcharger (make-laptopcharger adjs '() location #false))]
     (begin (initialize-thing! laptopcharger)
            laptopcharger)))
 
@@ -556,18 +544,18 @@
    #:methods
   ;; hide the noun.
   (define (noun laptopcharger)
-    "power outlet")
+    "")
   ;; change examine to return keycard description.
   (define (examine laptop)
-    "A standard two ports power outlet. AC 110V 10A."
+    (display-line "A standard two ports power outlet. AC 110V 10A.")
     )
 )
 
 ;; new-poweroutlet: string, container, number -> poweroutlet
 ;; Makes a power outlet with the specified parameters.
 (define (new-poweroutlet adjectives location)
-  (local [(define adjs (string->words (string-append adjectives)))
-          (define poweroutlet (make-poweroutlet adjs '() location))]
+  (local [(define adjs (string->words (string-append adjectives " power outlet")))
+          (define poweroutlet (make-poweroutlet adjs '() location #false))]
     (begin (initialize-thing! poweroutlet)
            poweroutlet)))
 
@@ -739,10 +727,6 @@
 ;; Recreate the player object and all the rooms and things.
 (define (start-game)
   ;; Fill this in with the rooms you want
-
-  (local [(define starting-room (new-room "small cold"))]
-    (begin (set! me (new-person "" starting-room))
-
   (local [(define dorm-room (new-room "dorm"))
           (define dorm-hallway (new-room "hallway"))]
     (begin (set! me (new-person "Tommy Cat" dorm-room))
@@ -752,10 +736,10 @@
                   dorm-hallway "dorm" #t)
            ;; Add code here to add things to your rooms
 
-           (new-food "apple" starting-room "apple" 15)
-           (new-food "pie" starting-room "pie" 40)
+           (new-food "apple" dorm-room "apple" 15)
+           (new-food "pie" dorm-room "pie" 40)
            (new-storage "old treasure chest"                                                    
-                        starting-room
+                        dorm-room
                         false
                         "it is an old treasure chest, cool")
            (new-food "ripe yellow banana"
@@ -764,17 +748,17 @@
                      10)
            
            (new-beverage "cold glass of water"
-                         starting-room
+                         dorm-room
                          "it is a cold glass of water"
                          25)
            
            (new-beverage "warm glass of water"
-                         starting-room
+                         dorm-room
                          "a"
                          50)
            
            (new-disguise "fake moustache"
-                         starting-room
+                         dorm-room
                          "it is a cool fake moustache"
                          )
 
@@ -804,8 +788,6 @@
 ;;; UTILITIES
 ;;;
 
-<<<<<<< Updated upstream
-=======
 ;; bargraph: number -> string
 ;; Outputs a string as a hunger/thirst bar.
 (define (bargraph value)
@@ -814,6 +796,7 @@
       (display-line (list->string (append (make-list value #\■) (make-list (- 20 value) #\□))))
       )
   )
+
 
 ;; update-stats: updates a player's hunger and thirst when an action is performed
 (define (update-stats)
@@ -826,8 +809,6 @@
         (go (the door))
         (error "You died of thirst."))))
     
-
->>>>>>> Stashed changes
 ;; here: -> container
 ;; The current room the player is in
 (define (here)
