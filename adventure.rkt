@@ -38,7 +38,19 @@
   (define (print-description o)
     (begin (printf (description o))
            (newline)
-           (void))))
+           (void)))
+  ;; other type methods are defined here so a specified message can be displayed easily if the method is called on a type it shouldn't be
+  (define (eat food)
+    (display-line "That isn't food."))
+  (define (drink o)
+    (display-line "That isn't a beverage."))
+  (define (open x)
+    (begin
+      (display-line "That object isn't a storage container")))
+  (define (wear x)
+    (display-line "That isn't a disguise.")))
+
+
 
 ;;;
 ;;; CONTAINER
@@ -80,7 +92,7 @@
   (define (remove! container thing)
     (set-container-contents! container
                              (remove thing
-                                     (container-contents container))))
+                                     (container-contents container)))))
   
   ;; add!: container thing -> void
   ;; EFFECT: adds the thing to the container.  Does not update the thing's location.
@@ -97,7 +109,7 @@
                  (printf "There's nothing here.~%")
                  (begin (printf "You see:~%")
                         (for-each print-description other-stuff))))
-           (void))))
+           (void))) 
 
 ;; move!: thing container -> void
 ;; Moves thing from its previous location to container.
@@ -132,7 +144,7 @@
 
 ;; new-room: string -> room
 ;; Makes a new room with the specified adjectives
-(define (new-room adjectives)
+ (define (new-room adjectives)
   (make-room (string->words adjectives)
              '()))
 
@@ -144,7 +156,8 @@
 (define-struct (thing container)
   ;; location: container
   ;; What room or other container this thing is presently located in.
-  (location)
+  (location
+   takable?)
   
   #:methods
   (define (examine thing)
@@ -193,20 +206,30 @@
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
+
+    (begin (move! me (door-destination door))
+             (look))))
     (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
         (display-line "This door seems to be locked.")
         (begin (move! me (door-destination door))
            (look)))
     ))
 
+
 ;; join: room string room string
 ;; EFFECT: makes a pair of doors with the specified adjectives
 ;; connecting the specified rooms.
 (define (join! room1 adjectives1 room2 adjectives2 locked?)
   (local [(define r1->r2 (make-door (string->words adjectives1)
+
+                                    '() room1 false room2))
+          (define r2->r1 (make-door (string->words adjectives2)
+                                    '() room2 false room1))]
+
                                     '() room1 room2 locked?))
           (define r2->r1 (make-door (string->words adjectives2)
                                     '() room2 room1 locked?))]
+
     (begin (initialize-thing! r1->r2)
            (initialize-thing! r2->r1)
            (void))))
@@ -217,7 +240,15 @@
 ;;;
 
 (define-struct (person thing)
-  ())
+  (;; hunger: person's hunger level
+   hunger
+   ;; thirst: how thirsty the person is
+   thirst
+
+  ;; hp: player's health points
+   hp
+   ;; disguised? set to true while the player wears a disguise prop
+   disguised?))
 
 ;; initialize-person: person -> void
 ;; EFFECT: do whatever initializations are necessary for persons.
@@ -230,7 +261,12 @@
   (local [(define person
             (make-person (string->words adjectives)
                          '()
-                         location))]
+                         location
+                         false
+                         20
+                         20
+                         100
+                         false))]
     (begin (initialize-person! person)
            person)))
 
@@ -265,7 +301,7 @@
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
-          (define prop (make-prop adjectives '() location noun examine-text))]
+          (define prop (make-prop adjectives '() location true noun examine-text))]
     (begin (initialize-thing! prop)
            prop)))
 
@@ -336,6 +372,114 @@
     (begin (initialize-thing! securitycam)
            securitycam)))
 
+
+(define-struct (food prop)
+  (satiety)
+  #:methods
+  (define (eat food)
+    (if (not (empty? (container-contents food)))
+        (display-line (string-append "Wow! there's " (description (first (container-contents food))) " in here!"))
+        (if (< (person-hunger me) 1)
+            (display-line "You're not hungry anymore.")
+            (begin
+              (destroy! food)
+              (display-line "Tasty!")
+              (if (< (- (person-hunger me) (food-satiety food)) 0)
+                  (begin (set-person-hunger! me 0)
+                         (display-line "You're full!")
+                         )
+                  (set-person-hunger! me (-
+                                          (person-hunger me)
+                                          (food-satiety food))))
+              (display-line (string-append "Your hunger level is "
+                                           (number->string (person-hunger me)))))))))
+
+(define (new-food description location examine-text satiety)
+  (local [(define words (string->words description))
+          (define noun (last words))
+          (define adjectives (drop-right words 1))
+          (define food (make-food adjectives '() location true noun examine-text satiety))]
+    (begin (initialize-thing! food)
+           food)))
+
+(define-struct (beverage prop)
+  (satiety)
+  #:methods
+  (define (drink o)
+            
+        (if (< (person-thirst me) 1)
+            (display-line "You're not thirsty anymore.")
+            (begin
+              (destroy! o)
+              (display-line "mmm, thirst-quenching!")
+              (if (< (- (person-thirst me) (beverage-satiety o)) 0)
+                  (set-person-thirst! me 0)
+                  (set-person-thirst! me (-
+                                          (person-thirst me)
+                                          (beverage-satiety o))))
+              (display-line (string-append "your thirst level is "
+                                           (number->string (person-thirst me))))))))
+
+(define (new-beverage description location examine-text satiety)
+  (local [(define words (string->words description))
+          (define noun (last words))
+          (define adjectives (drop-right words 1))
+          (define beverage (make-beverage adjectives '() location true noun examine-text satiety))]
+    (begin (initialize-thing! beverage)
+           beverage)))
+
+
+
+(define-struct (storage prop)
+  ()
+
+  #:methods
+  (define (open storage)
+    (begin      
+      (describe-contents storage)
+      (move! me (the storage))
+      (newline)
+      (display-line "Close the object with (close)"))))
+
+(define (new-storage description location bool examine-text)
+  (local [(define words (string->words description))
+          (define noun (last words))
+          (define adjectives (drop-right words 1))
+          (define storage (make-storage adjectives '() location bool noun examine-text))]
+    (begin (initialize-thing! storage)
+           storage)))
+
+(define-struct (disguise prop)
+  ()
+
+  #:methods
+  (define (wear x)
+    (unless (person-disguised? me)
+    (if (equal? (thing-location x) me)
+        (begin
+          (set-person-disguised?! me true)
+          (display-line "You are now disguised."))
+        (begin
+          (take x)
+          (set-person-disguised?! me true)
+          (display-line "You are now disguised."))))))
+
+  (define (new-disguise description location examine-text)
+    (local [(define words (string->words description))
+            (define noun (last words))
+            (define adjectives (drop-right words 1))
+            (define disguise (make-disguise adjectives '() location true noun examine-text))]
+      (begin (initialize-thing! disguise)
+             disguise)))
+          
+    
+    
+  
+      
+    
+
+
+
 ;;;
 ;;; LAPTOP
 ;;; Laptop: allows hacking.
@@ -366,6 +510,7 @@
           (define laptop (make-laptop adjs '() location batterylevel))]
     (begin (initialize-thing! laptop)
            laptop)))
+
 
 ;;;
 ;;; LAPTOPCHARGER
@@ -444,7 +589,10 @@
   "Takes a closer look at the thing")
 
 (define (take thing)
-  (move! thing me))
+  (if (thing-takable? thing)
+      (begin
+        (move! thing me))
+      (display-line "You can't take that.")))
 
 (define-user-command (take thing)
   "Moves thing to your inventory")
@@ -489,6 +637,55 @@
 ;;; ADD YOUR COMMANDS HERE!
 ;;;
 
+
+;; check-hunger: displays player's hunger level
+(define (check-hunger)
+  (person-hunger me))
+
+(define-user-command (check-hunger)
+  "Displays the player's hunger level.")
+
+;; check-thirst: displays player's thirst level
+(define (check-thirst)
+  (person-thirst me))
+
+(define-user-command (check-thirst)
+  "Displays the player's thirst level.")
+
+(define (close)
+  (if (storage? (thing-location me))
+      (move! me (thing-location (thing-location me)))
+      (display-line "You haven't opened a storage object.")))
+
+(define-user-command (open storage)
+  "Opens a storage object, giving the player access to its contents.")
+
+(define-user-command (close)
+  "Closes a storage object the player opened.")
+
+(define-user-command (eat food)
+  "Consumes a food object, lowering the player's hunger level.")
+
+(define-user-command (drink beverage)
+  "Drinks a beverage object, lowering the player's thirst level.")
+
+(define-user-command (wear disguise)
+  "Takes a disguise object if the player hasn't already, and disguises the player")
+
+(define (remove-disguise)
+  (if (person-disguised? me)
+      (begin
+        (set-person-disguised?! me false)
+        (display-line "You are no longer disguised."))
+      (display-line "You aren't wearing a disguise.")))
+
+(define-user-command (remove-disguise)
+  "Un-disguises the player, but leaves the object in their inventory.")
+
+
+
+   
+
 ;; hack: securitycam -> void
 ;; Change the status of the camera.
 (define (hack securitycam)
@@ -520,6 +717,7 @@
       (display-line "You don't know how to charge your laptop without a charger."))
 )
 
+
 ;;;
 ;;; THE GAME WORLD - FILL ME IN
 ;;;
@@ -528,13 +726,50 @@
 ;; Recreate the player object and all the rooms and things.
 (define (start-game)
   ;; Fill this in with the rooms you want
+
+  (local [(define starting-room (new-room "small cold"))]
+    (begin (set! me (new-person "" starting-room))
+
   (local [(define dorm-room (new-room "dorm"))
           (define dorm-hallway (new-room "hallway"))]
     (begin (set! me (new-person "Tommy Cat" dorm-room))
+
            ;; Add join commands to connect your rooms with doors
            (join! dorm-room "hallway"
                   dorm-hallway "dorm" #t)
            ;; Add code here to add things to your rooms
+
+           (new-food "apple" starting-room "apple" 15)
+           (new-food "pie" starting-room "pie" 40)
+           (new-storage "old treasure chest"                                                    
+                        starting-room
+                        false
+                        "it is an old treasure chest, cool")
+           (new-food "ripe yellow banana"
+                     (the storage)
+                     "it is a ripe yellow banana"
+                     10)
+           
+           (new-beverage "cold glass of water"
+                         starting-room
+                         "it is a cold glass of water"
+                         25)
+           
+           (new-beverage "warm glass of water"
+                         starting-room
+                         "a"
+                         50)
+           
+           (new-disguise "fake moustache"
+                         starting-room
+                         "it is a cool fake moustache"
+                         )
+
+           (new-prop "large file"
+                     "What was this doing in an apple?"
+                     (the apple))
+           
+
            (new-keycard "Charles" 2 dorm-hallway dorm-room)
            (new-keycard "Tommy" 1 dorm-hallway me)
            (new-laptop "silver Banana Pro" dorm-room 1)
