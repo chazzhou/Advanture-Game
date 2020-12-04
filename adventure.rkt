@@ -37,7 +37,19 @@
   (define (print-description o)
     (begin (printf (description o))
            (newline)
-           (void))))
+           (void)))
+  ;; other type methods are defined here so a specified message can be displayed easily if the method is called on a type it shouldn't be
+  (define (eat food)
+    (display-line "That isn't food."))
+  (define (drink o)
+    (display-line "That isn't a beverage."))
+  (define (open x)
+    (begin
+      (display-line "That object isn't a storage container")))
+  (define (wear x)
+    (display-line "That isn't a disguise.")))
+
+
 
 ;;;
 ;;; CONTAINER
@@ -95,13 +107,7 @@
              (if (empty? other-stuff)
                  (printf "There's nothing here.~%")
                  (begin (printf "You see:~%")
-                        (for-each print-description (filter (lambda (x)
-                                                              (if (door? x)
-                                                                  (not (door-invisible? x))
-                                                                  true))
-
-
-                                                                  other-stuff)))))
+                        (for-each print-description other-stuff))))
            (void))) 
 
 ;; move!: thing container -> void
@@ -149,7 +155,8 @@
 (define-struct (thing container)
   ;; location: container
   ;; What room or other container this thing is presently located in.
-  (location)
+  (location
+   takable?)
   
   #:methods
   (define (examine thing)
@@ -187,27 +194,23 @@
 (define-struct (door thing)
   ;; destination: container
   ;; The place this door leads to
-  (destination
-   invisible?)
+  (destination)
   
   #:methods
   ;; go: door -> void
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
     (begin (move! me (door-destination door))
-           (unless (storage? (door-destination door))
-             (look)))))
+             (look))))
 
 ;; join: room string room string
 ;; EFFECT: makes a pair of doors with the specified adjectives
 ;; connecting the specified rooms.
-(define (join! room1 adjectives1 bool1 room2 adjectives2 bool2)
+(define (join! room1 adjectives1 room2 adjectives2)
   (local [(define r1->r2 (make-door (string->words adjectives1)
-                                    '() room1 room2
-                                    bool1))
+                                    '() room1 false room2))
           (define r2->r1 (make-door (string->words adjectives2)
-                                    '() room2 room1
-                                    bool2))]
+                                    '() room2 false room1))]
     (begin (initialize-thing! r1->r2)
            (initialize-thing! r2->r1)
            (void))))
@@ -221,7 +224,12 @@
   (;; hunger: person's hunger level
    hunger
    ;; thirst: how thirsty the person is
-   thirst))
+   thirst
+
+  ;; hp: player's health points
+   hp
+   ;; disguised? set to true while the player wears a disguise prop
+   disguised?))
 
 ;; initialize-person: person -> void
 ;; EFFECT: do whatever initializations are necessary for persons.
@@ -235,8 +243,11 @@
             (make-person (string->words adjectives)
                          '()
                          location
+                         false
                          20
-                         20))]
+                         20
+                         100
+                         false))]
     (begin (initialize-person! person)
            person)))
 
@@ -271,7 +282,7 @@
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
-          (define prop (make-prop adjectives '() location noun examine-text))]
+          (define prop (make-prop adjectives '() location true noun examine-text))]
     (begin (initialize-thing! prop)
            prop)))
 
@@ -285,20 +296,28 @@
   (satiety)
   #:methods
   (define (eat food)
-    (begin
-      (destroy! food)
-      (display-line "tasty!")
-      (set-person-hunger! me (-
-                             (person-hunger me)
-                             (food-satiety food)))
-    (display-line (string-append "your hunger level is "
-                                   (number->string (person-hunger me)))))))
+    (if (not (empty? (container-contents food)))
+        (display-line (string-append "Wow! there's " (description (first (container-contents food))) " in here!"))
+        (if (< (person-hunger me) 1)
+            (display-line "You're not hungry anymore.")
+            (begin
+              (destroy! food)
+              (display-line "Tasty!")
+              (if (< (- (person-hunger me) (food-satiety food)) 0)
+                  (begin (set-person-hunger! me 0)
+                         (display-line "You're full!")
+                         )
+                  (set-person-hunger! me (-
+                                          (person-hunger me)
+                                          (food-satiety food))))
+              (display-line (string-append "Your hunger level is "
+                                           (number->string (person-hunger me)))))))))
 
 (define (new-food description location examine-text satiety)
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
-          (define food (make-food adjectives '() location noun examine-text satiety))]
+          (define food (make-food adjectives '() location true noun examine-text satiety))]
     (begin (initialize-thing! food)
            food)))
 
@@ -306,20 +325,25 @@
   (satiety)
   #:methods
   (define (drink o)
-    (begin
-      (destroy! o)
-      (display-line "mmm, thirst-quenching!")
-      (set-person-thirst! me (-
-                              (person-thirst me)
-                              (beverage-satiety o)))
-      (display-line (string-append "your thirst level is "
-                                   (number->string (person-thirst me)))))))
+            
+        (if (< (person-thirst me) 1)
+            (display-line "You're not thirsty anymore.")
+            (begin
+              (destroy! o)
+              (display-line "mmm, thirst-quenching!")
+              (if (< (- (person-thirst me) (beverage-satiety o)) 0)
+                  (set-person-thirst! me 0)
+                  (set-person-thirst! me (-
+                                          (person-thirst me)
+                                          (beverage-satiety o))))
+              (display-line (string-append "your thirst level is "
+                                           (number->string (person-thirst me))))))))
 
 (define (new-beverage description location examine-text satiety)
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
-          (define beverage (make-beverage adjectives '() location noun examine-text satiety))]
+          (define beverage (make-beverage adjectives '() location true noun examine-text satiety))]
     (begin (initialize-thing! beverage)
            beverage)))
 
@@ -332,24 +356,44 @@
   (define (open storage)
     (begin      
       (describe-contents storage)
-      (join! (thing-location me) "a" true
-             storage "b" true)
-      (go (the a door)))))
+      (move! me (the storage))
+      (newline)
+      (display-line "Close the object with (close)"))))
 
-(define (new-storage description contents location examine-text)
+(define (new-storage description location bool examine-text)
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
-          (define storage (make-storage adjectives contents location noun examine-text))]
+          (define storage (make-storage adjectives '() location bool noun examine-text))]
     (begin (initialize-thing! storage)
            storage)))
 
-(define-struct (flyer prop)
-  (text)
+(define-struct (disguise prop)
+  ()
 
   #:methods
-  (define (read flyer)
-    (flyer-text flyer)))
+  (define (wear x)
+    (unless (person-disguised? me)
+    (if (equal? (thing-location x) me)
+        (begin
+          (set-person-disguised?! me true)
+          (display-line "You are now disguised."))
+        (begin
+          (take x)
+          (set-person-disguised?! me true)
+          (display-line "You are now disguised."))))))
+
+  (define (new-disguise description location examine-text)
+    (local [(define words (string->words description))
+            (define noun (last words))
+            (define adjectives (drop-right words 1))
+            (define disguise (make-disguise adjectives '() location true noun examine-text))]
+      (begin (initialize-thing! disguise)
+             disguise)))
+          
+    
+    
+  
       
     
 
@@ -384,8 +428,10 @@
   "Takes a closer look at the thing")
 
 (define (take thing)
-  (begin
-    (move! thing me)))
+  (if (thing-takable? thing)
+      (begin
+        (move! thing me))
+      (display-line "You can't take that.")))
 
 (define-user-command (take thing)
   "Moves thing to your inventory")
@@ -434,13 +480,47 @@
 (define (check-hunger)
   (person-hunger me))
 
+(define-user-command (check-hunger)
+  "Displays the player's hunger level.")
+
 ;; check-thirst: displays player's thirst level
 (define (check-thirst)
   (person-thirst me))
 
+(define-user-command (check-thirst)
+  "Displays the player's thirst level.")
+
 (define (close)
-    (begin
-      (go (the b door))))
+  (if (storage? (thing-location me))
+      (move! me (thing-location (thing-location me)))
+      (display-line "You haven't opened a storage object.")))
+
+(define-user-command (open storage)
+  "Opens a storage object, giving the player access to its contents.")
+
+(define-user-command (close)
+  "Closes a storage object the player opened.")
+
+(define-user-command (eat food)
+  "Consumes a food object, lowering the player's hunger level.")
+
+(define-user-command (drink beverage)
+  "Drinks a beverage object, lowering the player's thirst level.")
+
+(define-user-command (wear disguise)
+  "Takes a disguise object if the player hasn't already, and disguises the player")
+
+(define (remove-disguise)
+  (if (person-disguised? me)
+      (begin
+        (set-person-disguised?! me false)
+        (display-line "You are no longer disguised."))
+      (display-line "You aren't wearing a disguise.")))
+
+(define-user-command (remove-disguise)
+  "Un-disguises the player, but leaves the object in their inventory.")
+
+
 
     
 
@@ -459,18 +539,34 @@
 
            ;; Add code here to add things to your rooms
            (new-food "apple" starting-room "apple" 15)
-           (new-storage "old treasure chest"                        
-                        '()                            
+           (new-food "pie" starting-room "pie" 40)
+           (new-storage "old treasure chest"                                                    
                         starting-room
+                        false
                         "it is an old treasure chest, cool")
            (new-food "ripe yellow banana"
                      (the storage)
                      "it is a ripe yellow banana"
                      10)
+           
            (new-beverage "cold glass of water"
                          starting-room
                          "it is a cold glass of water"
-                         15)
+                         25)
+           
+           (new-beverage "warm glass of water"
+                         starting-room
+                         "a"
+                         50)
+           
+           (new-disguise "fake moustache"
+                         starting-room
+                         "it is a cool fake moustache"
+                         )
+
+           (new-prop "large file"
+                     "What was this doing in an apple?"
+                     (the apple))
            
            (check-containers!)
            (void))))
