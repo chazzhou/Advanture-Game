@@ -368,6 +368,56 @@
            laptop)))
 
 ;;;
+;;; LAPTOPCHARGER
+;;; Laptop Charger: allows charging.
+;;;
+(define-struct (laptopcharger thing)
+  ()
+
+   #:methods
+  ;; hide the noun.
+  (define (noun laptopcharger)
+    "")
+  ;; change examine to return keycard description.
+  (define (examine laptopcharger)
+    "A laptop charger for Banana Pro laptop. Needs an outlet: AC 110V 10A."
+    )
+)
+
+;; new-laptopcharger: string, container, number -> laptopcharger
+;; Makes a laptop with the specified parameters.
+(define (new-laptopcharger adjectives location)
+  (local [(define adjs (string->words (string-append adjectives " laptop charger")))
+          (define laptopcharger (make-laptopcharger adjs '() location))]
+    (begin (initialize-thing! laptopcharger)
+           laptopcharger)))
+
+;;;
+;;; POWEROUTLET
+;;; Power Outlet: allows charging.
+;;;
+(define-struct (poweroutlet thing)
+  ()
+
+   #:methods
+  ;; hide the noun.
+  (define (noun laptopcharger)
+    "power outlet")
+  ;; change examine to return keycard description.
+  (define (examine laptop)
+    "A standard two ports power outlet. AC 110V 10A."
+    )
+)
+
+;; new-poweroutlet: string, container, number -> poweroutlet
+;; Makes a power outlet with the specified parameters.
+(define (new-poweroutlet adjectives location)
+  (local [(define adjs (string->words (string-append adjectives)))
+          (define poweroutlet (make-poweroutlet adjs '() location))]
+    (begin (initialize-thing! poweroutlet)
+           poweroutlet)))
+
+;;;
 ;;; USER COMMANDS
 ;;;
 
@@ -459,6 +509,17 @@
       (display-line "You don't have a a device that you can use to hack things with."))
   )
 
+;; charge: -> void
+;; Charge the laptop if a charger is present.
+(define (charge)
+  (if (have-a? laptopcharger?)
+      (if (have-a-in-room? poweroutlet?)
+          (begin (set-laptop-batterylevel! (the laptop) 100)
+                 (display-line "Battery charged."))
+          (display-line "There's no power outlet nearby."))
+      (display-line "You don't know how to charge your laptop without a charger."))
+)
+
 ;;;
 ;;; THE GAME WORLD - FILL ME IN
 ;;;
@@ -478,6 +539,8 @@
            (new-keycard "Tommy" 1 dorm-hallway me)
            (new-laptop "silver Banana Pro" dorm-room 1)
            (new-securitycam "black" dorm-hallway #t)
+           (new-laptopcharger "black" me)
+           (new-poweroutlet "white" dorm-room)
            (check-containers!)
            (void))))
 
@@ -530,6 +593,12 @@
 (define (have-a? predicate)
   (ormap predicate
          (container-accessible-contents me)))
+
+;; have-a-in-room?: predicate -> boolean
+;; True if the player as something satisfying predicate in their pocket or the room.
+(define (have-a-in-room? predicate)
+  (ormap predicate
+         (stuff-here-except-me)))
 
 ;; find-the: (listof string) -> object
 ;; Returns the object from (accessible-objects)
