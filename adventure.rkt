@@ -41,14 +41,16 @@
            (void)))
   ;; other type methods are defined here so a specified message can be displayed easily if the method is called on a type it shouldn't be
   (define (eat food)
-    (display-line "That isn't food."))
+    (display-line "Funny. That isn't food."))
   (define (drink o)
-    (display-line "That isn't a beverage."))
+    (display-line "lol. That isn't a beverage."))
   (define (open x)
     (begin
       (display-line "That object isn't a storage container")))
   (define (wear x)
-    (display-line "That isn't a disguise.")))
+    (display-line "You can't wear that."))
+  (define (charge laptop)
+    (display-line "You don't know how to charge that.")))
 
 
 
@@ -207,7 +209,7 @@
   ;; EFFECT: Moves the player to the door's location and (look)s around.
   (define (go door)
     (begin
-      (update-stats)
+      (update-stats 2 2)
       (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
         (display-line "This door seems to be locked.")
         (begin (move! me (door-destination door))
@@ -233,14 +235,17 @@
 ;;;
 
 (define-struct (person thing)
-  (;; hunger: person's hunger level
+  (;; hunger: person's hunger level.
+   ;; An integer from 0 to 20.
    hunger
-   ;; thirst: how thirsty the person is
+   ;; thirst: person's thirst level.
+   ;; An integer from 0 to 20.
    thirst
-
-  ;; hp: player's health points
+   ;; hp: player's health points.
+   ;; An integer from 0 to 20.
    hp
-   ;; disguised? set to true while the player wears a disguise prop
+   ;; disguised?: A boolean value.
+   ;; True while the player wears a disguise prop.
    disguised?))
 
 ;; initialize-person: person -> void
@@ -258,7 +263,7 @@
                          false
                          20
                          20
-                         100
+                         20
                          false))]
     (begin (initialize-person! person)
            person)))
@@ -374,55 +379,65 @@
         (begin
           (display-line (string-append "Wow! there's " (description (first (container-contents food))) " in here!"))
           (move! (first (container-contents food)) me)
-          (display-line (string-append "You took" (description (last (container-contents me))) ". Your hunger level stays the same.")))
-        (if (< (person-hunger me) 1)
-            (display-line "You're not hungry anymore.")
+          (display-line (string-append "You took " (description (last (container-contents me))) ". Your hunger level stays the same.")))
+        (if (= (person-hunger me) 20)
+            (begin (display-line "You are too full to eat this.")
+                   (check-hunger))
             (begin
               (destroy! food)
               (display-line "Tasty!")
-              (if (< (- (person-hunger me) (food-satiety food)) 0)
-                  (begin (set-person-hunger! me 0)
-                         (display-line "You're full!")
-                         )
-                  (set-person-hunger! me (-
+              (if (> (+ (person-hunger me) (food-satiety food)) 20)
+                  (begin (set-person-hunger! me 20)
+                         (display-line "You're full!"))
+                  (set-person-hunger! me (+
                                           (person-hunger me)
                                           (food-satiety food))))
-              (display-line (string-append "Your hunger level is "
-                                           (number->string (person-hunger me)))))))))
+              (mystatus))))))
 
 (define (new-food description location examine-text satiety)
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
           (define food (make-food adjectives '() location true noun examine-text satiety))]
-    (begin (initialize-thing! food)
-           food)))
+    (if (or (< satiety 0) (> satiety 20))
+              (error "Bad satiety value.")
+              (begin (initialize-thing! food)
+           food))))
 
 (define-struct (beverage prop)
   (satiety)
+  
   #:methods
   (define (drink o)
-            
-        (if (< (person-thirst me) 1)
-            (display-line "You're not thirsty anymore.")
+        (if (= (person-thirst me) 20)
+            (begin (display-line "You are too full to drink this.")
+                   (check-thirst))
             (begin
               (destroy! o)
               (display-line "mmm, thirst-quenching!")
-              (if (< (- (person-thirst me) (beverage-satiety o)) 0)
-                  (set-person-thirst! me 0)
-                  (set-person-thirst! me (-
-                                          (person-thirst me)
-                                          (beverage-satiety o))))
-              (display-line (string-append "your thirst level is "
-                                           (number->string (person-thirst me))))))))
+              (if (> (+ (person-thirst me) (beverage-satiety o)) 20)
+                  (begin (set-person-thirst! me 20)
+                         (display-line "You're fully hydrated."))
+                  (set-person-thirst! me (+ (person-thirst me)
+                                            (beverage-satiety o))))
+              (mystatus)
+              )
+            )
+    )
+  )
 
 (define (new-beverage description location examine-text satiety)
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
           (define beverage (make-beverage adjectives '() location true noun examine-text satiety))]
-    (begin (initialize-thing! beverage)
-           beverage)))
+    (if (or (< satiety 0) (> satiety 20))
+              (error "Bad satiety value.")
+              (begin (initialize-thing! beverage)
+                     beverage)
+    )
+  )
+)
 
 
 
@@ -432,11 +447,13 @@
   #:methods
   (define (open storage)
     (begin
-      (update-stats)
+      (update-stats 1 1)
       (describe-contents storage)
-      (move! me (the storage))
+      (move! me storage)
       (newline)
-      (display-line "Close the object with (close)"))))
+      (printf "Close the ~A with (close).~%"
+                 (noun storage))
+      )))
 
 (define (new-storage description location bool examine-text)
   (local [(define words (string->words description))
@@ -452,14 +469,23 @@
   #:methods
   (define (wear x)
     (unless (person-disguised? me)
+    ;; Check if the item is in player's inv
     (if (equal? (thing-location x) me)
         (begin
+          (update-stats 4 1)
           (set-person-disguised?! me true)
-          (display-line "You are now disguised."))
+          (display-line "You are now disguised.")
+          (display-line "You realized that being disguised requires more physical effort.")
+          (mystatus))
+        ;; If not, make sure the player takes it
         (begin
-          (take x)
+          (move! x me)
+          (display-line "You took the item.")
+          (update-stats 5 2)
           (set-person-disguised?! me true)
-          (display-line "You are now disguised."))))))
+          (display-line "You are now disguised.")
+          (display-line "You realized that being disguised requires more physical effort.")
+          (mystatus))))))
 
   (define (new-disguise description location examine-text)
     (local [(define words (string->words description))
@@ -469,24 +495,32 @@
       (begin (initialize-thing! disguise)
              disguise)))
           
-    
-    
-  
-      
-    
-
-
 
 ;;;
 ;;; LAPTOP
 ;;; Laptop: allows hacking.
 ;;;
 (define-struct (laptop thing)
-  ;; batterylevel: integer number from 0 to 100
+  ;; batterylevel: integer number from 0 to 20
   ;; How much battery is left.
   (batterylevel)
 
    #:methods
+  ;; charge: laptop -> void
+  ;; Charge the laptop if a charger is present.
+  (define (charge laptop)
+    (if (nearby? laptopcharger?)
+      (if (have-a-in-room? poweroutlet?)
+          (begin (update-stats 4 2)
+                 (if (> (+ (laptop-batterylevel laptop) 5) 20)
+                     (set-laptop-batterylevel! laptop 20)
+                     (set-laptop-batterylevel! laptop (+ (laptop-batterylevel laptop) 5)))
+                 (check-battery)
+                 (mystatus)
+                 )
+          (display-line "There's no power outlet nearby."))
+      (display-line "You don't know how to charge your laptop without a charger."))
+    )
   ;; hide the noun.
   (define (noun laptop)
     "")
@@ -494,7 +528,7 @@
   (define (examine laptop)
     (if (= 0 (laptop-batterylevel laptop))
     (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems dead.")
-    (if (= 100 (laptop-batterylevel laptop))
+    (if (= 20 (laptop-batterylevel laptop))
     (display-line "A Linix laptop with a Northwestern sticker on the front. The battery seems fully charged.")
     (display-line "A Linix laptop with a Northwestern sticker on the front. There are some battery left.")))
     )
@@ -530,7 +564,7 @@
 ;; Makes a laptop with the specified parameters.
 (define (new-laptopcharger adjectives location)
   (local [(define adjs (string->words (string-append adjectives " laptop charger")))
-          (define laptopcharger (make-laptopcharger adjs '() location #false))]
+          (define laptopcharger (make-laptopcharger adjs '() location #true))]
     (begin (initialize-thing! laptopcharger)
            laptopcharger)))
 
@@ -564,14 +598,18 @@
 ;;;
 
 (define (look)
-  (begin (printf "You are in ~A.~%"
+  (begin (if (storage? (here))
+             (printf "You are looking at a ~A.~%"
                  (description (here)))
+             (printf "You are in ~A.~%"
+                 (description (here))))
          (describe-contents (here))
-         (void)))
+         (mystatus)
+         (void)
+  )
+)
 
 (define-user-command (look) "Prints what you can see in the room")
-
-(define-user-command (hack thing) "try to hack the thing")
 
 (define (inventory)
   (if (empty? (my-inventory))
@@ -580,17 +618,19 @@
              (for-each print-description (my-inventory)))))
 
 (define-user-command (inventory)
-  "Prints the things you are carrying with you.")
+  "Prints the things you are carrying with you")
 
 (define-user-command (examine thing)
   "Takes a closer look at the thing")
 
 (define (take thing)
   (begin
-    (update-stats)
     (if (thing-takable? thing)
       (begin
-        (move! thing me))
+        (update-stats 1 1)
+        (move! thing me)
+        (display-line "You took the item.")
+        (mystatus))
       (display-line "You can't take that."))))
 
 (define-user-command (take thing)
@@ -600,14 +640,13 @@
   (move! thing (here)))
 
 (define-user-command (drop thing)
-  "Removes thing from your inventory and places it in the room
-")
+  "Removes thing from your inventory and places it in the room")
 
 (define (put thing container)
   (move! thing container))
 
 (define-user-command (put thing container)
-  "Moves the thing from its current location and puts it in the container.")
+  "Moves the thing from its current location and puts it in the container")
 
 (define (help)
   (for-each (λ (command-info)
@@ -636,39 +675,97 @@
 ;;; ADD YOUR COMMANDS HERE!
 ;;;
 
+;; mystatus: displays player's hunger, thirst, and hp.
+(define (mystatus)
+  (begin
+    (newline)
+    (display-line "Player Status: ")
+    (check-hunger)
+    (check-thirst)
+    (check-health)
+    )
+  )
+
+(define-user-command (mystatus)
+  "Displays the player's hunger, thirst, and health.")
 
 ;; check-hunger: displays player's hunger level
 (define (check-hunger)
-  (person-hunger me))
+  (begin
+    (display "Hunger: ")
+    (display (person-hunger me))
+    (display "/20 | ")
+    (bargraph (person-hunger me))
+    (unless (> (person-hunger me) 0)
+      (display-line "⚠ Your stomach is empty and you are dying because of hunger."))
+  )
+)
 
 (define-user-command (check-hunger)
-  "Displays the player's hunger level.")
+  "Displays the player's hunger level")
 
 ;; check-thirst: displays player's thirst level
 (define (check-thirst)
-  (person-thirst me))
+  (begin
+    (display "Thirst: ")
+    (display (person-thirst me))
+    (display "/20 | ")
+    (bargraph (person-thirst me))
+    (unless (> (person-thirst me) 0)
+      (display-line "⚠ You are dying due to lack of hydration."))
+  )
+)
 
 (define-user-command (check-thirst)
-  "Displays the player's thirst level.")
+  "Displays the player's thirst level")
+
+;; check-thirst: displays player's health level
+(define (check-health)
+  (begin
+    (display "Health: ")
+    (display (person-hp me))
+    (display "/20 | ")
+    (bargraph (person-hp me))
+  )
+)
+
+(define-user-command (check-battery)
+  "Displays the laptop's battery level")
+
+;; check-battery: displays the laptop's battery level
+(define (check-battery)
+  (begin
+    (display "Battery: ")
+    (display (laptop-batterylevel (the laptop)))
+    (display "/20 | ")
+    (bargraph (laptop-batterylevel (the laptop)))
+    (unless (< (laptop-batterylevel (the laptop)) 10)
+      (display-line "Battery sufficiently charged."))
+  )
+)
+
+(define-user-command (check-health)
+  "Displays the player's health level")
 
 (define (close)
   (if (storage? (thing-location me))
       (begin
         (display-line (string-append "You closed the " (description (thing-location me))))
+        (look)
         (move! me (thing-location (thing-location me))))
       (display-line "You haven't opened a storage object.")))
 
 (define-user-command (open storage)
-  "Opens a storage object, giving the player access to its contents.")
+  "Opens a storage object, giving the player access to its contents")
 
 (define-user-command (close)
   "Closes a storage object the player opened.")
 
 (define-user-command (eat food)
-  "Consumes a food object, lowering the player's hunger level.")
+  "Consumes a food object, lowering the player's hunger level")
 
 (define-user-command (drink beverage)
-  "Drinks a beverage object, lowering the player's thirst level.")
+  "Drinks a beverage object, lowering the player's thirst level")
 
 (define-user-command (wear disguise)
   "Takes a disguise object if the player hasn't already, and disguises the player")
@@ -676,24 +773,28 @@
 (define (remove-disguise)
   (if (person-disguised? me)
       (begin
+        (update-stats 0 0)
         (set-person-disguised?! me false)
         (display-line "You are no longer disguised."))
       (display-line "You aren't wearing a disguise.")))
 
 (define-user-command (remove-disguise)
-  "Un-disguises the player, but leaves the object in their inventory.")
+  "Un-disguises the player, but leaves the object in their inventory")
 
+(define-user-command (hack thing)
+  "Try to hack the thing")
 
-
-   
+(define-user-command (charge thing)
+  "Use the charger to charge the thing.")
 
 ;; hack: securitycam -> void
 ;; Change the status of the camera.
 (define (hack securitycam)
-  (if (have-a? laptop?)
-      (if (ormap (λ (x) (> (laptop-batterylevel x) 0)) (filter laptop? (my-inventory)))
+  (if (nearby? laptop?)
+      (if (ormap (λ (x) (> (laptop-batterylevel x) 10)) (filter laptop? (my-inventory)))
       (if (securitycam? securitycam)
-          (begin (set-securitycam-status! securitycam #f)
+          (begin (update-stats 5 3)
+                 (set-securitycam-status! securitycam #f)
                  (display-line "#     #    #     #####  #    # ####### ######  ### ")
                  (display-line "#     #   # #   #     # #   #  #       #     # ### ")
                  (display-line "#     #  #   #  #       #  #   #       #     # ### ")
@@ -701,23 +802,12 @@
                  (display-line "#     # ####### #       #  #   #       #     #     ")
                  (display-line "#     # #     # #     # #   #  #       #     # ### ")
                  (display-line "#     # #     #  #####  #    # ####### ######  ### ")
+                 (set-laptop-batterylevel! (the laptop) (- (laptop-batterylevel (the laptop)) 10))
                  )
           (display-line "You are not sure how to hack that."))
-      (display-line "You realized that your laptop is out of battery."))
+      (display-line "You tried but your laptop doesn't have enough battery."))
       (display-line "You don't have a a device that you can use to hack things with."))
   )
-
-;; charge: -> void
-;; Charge the laptop if a charger is present.
-(define (charge)
-  (if (have-a? laptopcharger?)
-      (if (have-a-in-room? poweroutlet?)
-          (begin (set-laptop-batterylevel! (the laptop) 100)
-                 (display-line "Battery charged."))
-          (display-line "There's no power outlet nearby."))
-      (display-line "You don't know how to charge your laptop without a charger."))
-)
-
 
 ;;;
 ;;; THE GAME WORLD - FILL ME IN
@@ -729,15 +819,15 @@
   ;; Fill this in with the rooms you want
   (local [(define dorm-room (new-room "dorm"))
           (define dorm-hallway (new-room "hallway"))]
-    (begin (set! me (new-person "Tommy Cat" dorm-room))
+    (begin (set! me (new-person "Willie the Wildcat" dorm-room))
 
            ;; Add join commands to connect your rooms with doors
            (join! dorm-room "hallway"
                   dorm-hallway "dorm" #t)
            ;; Add code here to add things to your rooms
 
-           (new-food "apple" dorm-room "apple" 15)
-           (new-food "pie" dorm-room "pie" 40)
+           (new-food "apple" dorm-room "apple" 5)
+           (new-food "pie" dorm-room "pie" 20)
            (new-storage "old treasure chest"                                                    
                         dorm-room
                         false
@@ -750,12 +840,12 @@
            (new-beverage "cold glass of water"
                          dorm-room
                          "it is a cold glass of water"
-                         25)
+                         5)
            
            (new-beverage "warm glass of water"
                          dorm-room
                          "a"
-                         50)
+                         8)
            
            (new-disguise "fake moustache"
                          dorm-room
@@ -767,11 +857,11 @@
                      (the apple))
            
 
-           (new-keycard "Charles" 2 dorm-hallway dorm-room)
-           (new-keycard "Tommy" 1 dorm-hallway me)
+           (new-keycard "Mortimer S. Schapiro" 2 dorm-hallway dorm-room)
+           (new-keycard "Willie the Wildcat" 1 dorm-hallway me)
            (new-laptop "silver Banana Pro" dorm-room 1)
            (new-securitycam "black" dorm-hallway #t)
-           (new-laptopcharger "black" me)
+           (new-laptopcharger "black" dorm-room)
            (new-poweroutlet "white" dorm-room)
            (check-containers!)
            (void))))
@@ -788,7 +878,7 @@
 ;;; UTILITIES
 ;;;
 
-;; bargraph: number -> string
+;; bargraph: number -> void:
 ;; Outputs a string as a hunger/thirst bar.
 (define (bargraph value)
   (if (or (< value 0) (> value 20))
@@ -797,17 +887,49 @@
       )
   )
 
-
-;; update-stats: updates a player's hunger and thirst when an action is performed
-(define (update-stats)
+;; update-stats number number -> void:
+;; Updates a player's hunger and thirst when an action is performed
+(define (update-stats hunger thirst)
   (begin
-    (if (> (person-hunger me) 0)
-        (set-person-hunger! me (- (person-hunger me) 1))
-        (error "You died of hunger."))
-    (if (> (person-hunger me) 0)
-        (set-person-thirst! me (- (person-thirst me) 1))
-        (go (the door))
-        (error "You died of thirst."))))
+    ;; Health regen if hunger and thirst levels are full.
+    (unless (and (= (person-hunger me) 20) (= (person-thirst me) 20))
+      (if (< (+ (person-hp me) 4) 20)
+          (set-person-hp! me (+ (person-hp me) 10))
+          (set-person-hp! me 20)))
+    ;; Penalty for disguised.
+    (if (person-disguised? me)
+      (begin (if (> (- (person-hunger me) (+ hunger 1)) 0)
+                 (set-person-hunger! me (- (person-hunger me) (+ hunger 1)))
+                 ;; Deducting health value when hunger level is empty.
+                 (if (< (+ (person-hp me) (- (person-hunger me) (+ hunger 1))) 1)
+                     (error "Oof. You died.")
+                     (begin (set-person-hp! me (+ (person-hp me) (- (person-hunger me) (+ hunger 1))))
+                            (set-person-hunger! me 0))))
+             (if (> (- (person-thirst me) (+ thirst 3)) 0)
+                 (set-person-thirst! me (- (person-thirst me) (+ thirst 3)))
+                  ;; Deducting health value when thirst level is empty.
+                 (if (< (+ (person-hp me) (- (person-thirst me) (+ thirst 3))) 1)
+                     (error "Oof. You died.")
+                     (begin (set-person-hp! me (+ (person-hp me) (- (person-thirst me) (+ thirst 3))))
+                            (set-person-thirst! me 0)))))
+      ;; Normal procedures.
+      (begin (if (> (- (person-hunger me) hunger) 0)
+                 (set-person-hunger! me (- (person-hunger me) hunger))
+                 ;; Deducting health value when hunger level is empty.
+                 (if (< (+ (person-hp me) (- (person-hunger me) hunger)) 1)
+                     (error "Oof. You died.")
+                     (begin (set-person-hp! me (+ (person-hp me) (- (person-hunger me) hunger)))
+                            (set-person-hunger! me 0))))
+             (if (> (- (person-thirst me) thirst) 0)
+                 (set-person-thirst! me (- (person-thirst me) thirst))
+                 ;; Deducting health value when thirst level is empty.
+                 (if (< (+ (person-hp me) (- (person-thirst me) thirst)) 1)
+                     (error "Oof. You died.")
+                     (begin (set-person-hp! me (+ (person-hp me) (- (person-thirst me) thirst)))
+                            (set-person-thirst! me 0)))))
+    )
+  )
+)
     
 ;; here: -> container
 ;; The current room the player is in
@@ -842,10 +964,16 @@
        me))
 
 ;; have-a?: predicate -> boolean
-;; True if the player as something satisfying predicate in their pocket.
+;; True if the player has something satisfying predicate in their pocket.
 (define (have-a? predicate)
   (ormap predicate
-         (container-accessible-contents me)))
+         (my-inventory)))
+
+;; nearby?: predicate -> boolean
+;; True if something satisfying predicate is in reach.
+(define (nearby? predicate)
+  (ormap predicate
+         (accessible-objects)))
 
 ;; have-a-in-room?: predicate -> boolean
 ;; True if the player as something satisfying predicate in their pocket or the room.
