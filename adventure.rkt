@@ -162,6 +162,18 @@
    takable?)
   
   #:methods
+  ;; take: thing -> void
+  ;; EFFECT: .
+  (define (take thing)
+  (begin
+    (if (thing-takable? thing)
+      (begin
+        (update-stats 1 1)
+        (move! thing me)
+        (display-line "You took the item.")
+        (mystatus))
+      (display-line "You can't take that."))))
+  
   (define (examine thing)
     (print-description thing))
 
@@ -374,7 +386,10 @@
     (begin (initialize-thing! securitycam)
            securitycam)))
 
-
+;;;
+;;; FOOD
+;;; You know, you eat this.
+;;;
 (define-struct (food prop)
   (satiety)
   #:methods
@@ -399,6 +414,8 @@
               (health-regen)
               (mystatus))))))
 
+;; new-food string, container, string, integer -> food
+;; Makes a new food object with the specified parameters.
 (define (new-food description location examine-text satiety)
   (local [(define words (string->words description))
           (define noun (last words))
@@ -409,9 +426,12 @@
               (begin (initialize-thing! food)
            food))))
 
+;;;
+;;; BEVERAGE
+;;; The thing you drink in game.
+;;;
 (define-struct (beverage prop)
   (satiety)
-  
   #:methods
   (define (drink o)
         (if (= (person-thirst me) 20)
@@ -432,6 +452,8 @@
     )
   )
 
+;; new-beverage string, container, string, integer -> beverage
+;; Makes a new beverage object with the specified parameters.
 (define (new-beverage description location examine-text satiety)
   (local [(define words (string->words description))
           (define noun (last words))
@@ -445,8 +467,10 @@
   )
 )
 
-
-
+;;;
+;;; STORAGE
+;;; Storage container for storing stuff.
+;;;
 (define-struct (storage prop)
   ()
 
@@ -461,6 +485,8 @@
                  (noun storage))
       )))
 
+;; new-storage string, container, boolean, string -> storage
+;; Makes a new storage object with the specified parameters.
 (define (new-storage description location bool examine-text)
   (local [(define words (string->words description))
           (define noun (last words))
@@ -469,6 +495,10 @@
     (begin (initialize-thing! storage)
            storage)))
 
+;;;
+;;; DISGUISE
+;;; Type of thing the player can wear to disguise from camera.
+;;;
 (define-struct (disguise prop)
   ()
 
@@ -493,6 +523,8 @@
           (display-line "You realized that being disguised requires more physical effort.")
           (mystatus))))))
 
+;; new-disguise string, container, string -> disguise
+;; Makes a new disguise object with the specified parameters.
   (define (new-disguise description location examine-text)
     (local [(define words (string->words description))
             (define noun (last words))
@@ -500,6 +532,27 @@
             (define disguise (make-disguise adjectives '() location true noun examine-text))]
       (begin (initialize-thing! disguise)
              disguise)))
+
+;;;
+;;; HOLYGRAIL
+;;; Type of thing the player takes to win the game.
+;;;
+(define-struct (holygrail prop)
+  ()
+
+  #:methods
+  (define (take x)
+    (display-line "Congrats! You won!")))
+
+;; new-holygrail string, container, string -> holygrail
+;; Makes a new disguise object with the specified parameters.
+  (define (new-holygrail description location examine-text)
+    (local [(define words (string->words description))
+            (define noun (last words))
+            (define adjectives (drop-right words 1))
+            (define holygrail (make-holygrail adjectives '() location true noun examine-text))]
+      (begin (initialize-thing! holygrail)
+             holygrail)))
           
 
 ;;;
@@ -628,16 +681,6 @@
 
 (define-user-command (examine thing)
   "Takes a closer look at the thing")
-
-(define (take thing)
-  (begin
-    (if (thing-takable? thing)
-      (begin
-        (update-stats 1 1)
-        (move! thing me)
-        (display-line "You took the item.")
-        (mystatus))
-      (display-line "You can't take that."))))
 
 (define-user-command (take thing)
   "Moves thing to your inventory")
@@ -827,12 +870,15 @@
 (define (start-game)
   ;; Fill this in with the rooms you want
   (local [(define dorm-room (new-room "dorm"))
-          (define dorm-hallway (new-room "hallway"))]
+          (define dorm-hallway (new-room "hallway"))
+          (define office (new-room "office"))]
     (begin (set! me (new-person "Willie the Wildcat" dorm-room))
 
            ;; Add join commands to connect your rooms with doors
            (join! dorm-room "hallway"
                   dorm-hallway "dorm" #t)
+           (join! dorm-hallway "office"
+                  office "hallway" #t)
            ;; Add code here to add things to your rooms
 
            (new-food "apple" dorm-room "apple" 5)
@@ -869,6 +915,10 @@
            (new-prop "large file"
                      "What was this doing in an apple?"
                      (the apple))
+
+           (new-holygrail "covidvax"
+                          office
+                          "vaccine for covid with micochip inside by Bill Gates")
            
 
            (new-keycard "Mortimer S. Schapiro" 2 dorm-hallway dorm-room)
