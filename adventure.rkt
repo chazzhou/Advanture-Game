@@ -396,9 +396,10 @@
   (define (eat food)
     (if (not (empty? (container-contents food)))
         (begin
-          (display-line (string-append "Wow! there's " (description (first (container-contents food))) " in here!"))
+          (display-line (string-append "¿¿ Wow! there's " (description (first (container-contents food))) " in here! ??"))
+          (display-line (string-append "You found " (description (first (container-contents food))) " inside " (description food) " and it's now in your inventory."))
           (move! (first (container-contents food)) me)
-          (display-line (string-append "You took " (description (last (container-contents me))) ". Your hunger level stays the same.")))
+          (display-line "Unfortunately you can't really eat it. Your hunger level stays the same."))
         (if (= (person-hunger me) 20)
             (begin (display-line "You are too full to eat this.")
                    (check-hunger))
