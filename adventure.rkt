@@ -212,8 +212,12 @@
       (update-stats 2 2)
       (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
         (display-line "This door seems to be locked.")
-        (begin (move! me (door-destination door))
-           (look))))))
+        (if (and (not (person-disguised? me)) (ormap (λ (x) (securitycam-status x)) (filter securitycam? (container-accessible-contents (door-destination door)))))
+            (error "You got caught by security camera behind the door and you have been neutralized.")
+            (begin (move! me (door-destination door))
+                   (look)))))
+      )
+    )
 
 
 ;; join: room string room string
@@ -330,14 +334,14 @@
    ;; change examine to return keycard description.
    (define (examine keycard)
     (display-line (string-append
-     "A purple Wildcard with a picture and a name: "
+     "A purple Wildcard with a picture and the name: "
      (keycard-owner keycard))))
 )
 
 ;; new-keycard: string, number, container, container -> keycard
 ;; Makes a new keycard with the specified parameters.
 (define (new-keycard owner access-level privilege location)
-  (local [(define adjs (string->words (string-append "wildcard with a name " owner)))
+  (local [(define adjs (string->words (string-append "wildcard with the name " owner)))
           (define keycard (make-keycard adjs '() location #true owner access-level privilege))]
     (begin (initialize-thing! keycard)
            keycard)))
@@ -392,6 +396,7 @@
                   (set-person-hunger! me (+
                                           (person-hunger me)
                                           (food-satiety food))))
+              (health-regen)
               (mystatus))))))
 
 (define (new-food description location examine-text satiety)
@@ -420,6 +425,7 @@
                          (display-line "You're fully hydrated."))
                   (set-person-thirst! me (+ (person-thirst me)
                                             (beverage-satiety o))))
+              (health-regen)
               (mystatus)
               )
             )
@@ -683,6 +689,8 @@
     (check-hunger)
     (check-thirst)
     (check-health)
+    (unless (not (person-disguised? me))
+      (display-line "~sneaky sneaky~"))
     )
   )
 
@@ -803,6 +811,7 @@
                  (display-line "#     # #     # #     # #   #  #       #     # ### ")
                  (display-line "#     # #     #  #####  #    # ####### ######  ### ")
                  (set-laptop-batterylevel! (the laptop) (- (laptop-batterylevel (the laptop)) 10))
+                 (mystatus)
                  )
           (display-line "You are not sure how to hack that."))
       (display-line "You tried but your laptop doesn't have enough battery."))
@@ -846,6 +855,11 @@
                          dorm-room
                          "a"
                          8)
+
+           (new-beverage "zero suger catorade"
+                         dorm-room
+                         "a"
+                         20)
            
            (new-disguise "fake moustache"
                          dorm-room
@@ -869,10 +883,20 @@
 ;;;
 ;;; PUT YOUR WALKTHROUGHS HERE
 ;;;
-
-
-
-
+(define-walkthrough walkthrough
+  (take (the pie))
+  (take (the catorade))
+  (take (the wildcard with the name Mortimer S. Schapiro))
+  (wear (the moustache))
+  (charge (the laptop))
+  (charge (the laptop))
+  (take (the laptop))
+  (go (the door))
+  (hack (the camera))
+  (eat (the pie))
+  (drink (the catorade))
+  (go (the door))
+  )
 
 ;;;
 ;;; UTILITIES
@@ -887,15 +911,20 @@
       )
   )
 
+;; health-regen:
+;; Health regen if hunger and thirst levels are full.
+(define (health-regen)
+  (if (and (= (person-hunger me) 20) (= (person-thirst me) 20))
+      (if (< (+ (person-hp me) 10) 20)
+          (set-person-hp! me (+ (person-hp me) 10))
+          (set-person-hp! me 20))
+    (void))
+  )
+
 ;; update-stats number number -> void:
 ;; Updates a player's hunger and thirst when an action is performed
 (define (update-stats hunger thirst)
   (begin
-    ;; Health regen if hunger and thirst levels are full.
-    (unless (and (= (person-hunger me) 20) (= (person-thirst me) 20))
-      (if (< (+ (person-hp me) 4) 20)
-          (set-person-hp! me (+ (person-hp me) 10))
-          (set-person-hp! me 20)))
     ;; Penalty for disguised.
     (if (person-disguised? me)
       (begin (if (> (- (person-hunger me) (+ hunger 1)) 0)
