@@ -852,7 +852,7 @@
 (define-user-command (check-health)
   "Displays the player's health level")
 
-;; close: close the container
+;; close: close the storage
 (define (close)
   (if (storage? (thing-location me))
       (begin
