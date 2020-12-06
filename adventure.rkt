@@ -580,6 +580,7 @@
            (display "It took you ")
            (display counter)
            (display " steps to finish the game.")
+           (newline)
            (sleep 5)
            (display-line "You took the admin keycard and unlocked the way out.")
            (sleep 2)
@@ -592,7 +593,8 @@
            (display-line "But if you didn't escape, you'll be the founder of next big tech firm.")
            (sleep 6)
            (display-line "Oof. At least you beat the game! Congratulations and Enjoy your break.")
-           (sleep 7))))
+           (sleep 10)
+           (endcredit))))
 
 ;; new-holygrail string, container, string -> holygrail
 ;; Makes a new disguise object with the specified parameters.
