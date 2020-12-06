@@ -142,13 +142,16 @@
 ;;;
 
 (define-struct (room container)
-  ())
+  (;; trap: boolean
+   ;; If the room behind it is trap.
+   trap))
 
 ;; new-room: string -> room
 ;; Makes a new room with the specified adjectives
  (define (new-room adjectives)
   (make-room (string->words adjectives)
-             '()))
+             '()
+             #false))
 
 ;;;
 ;;; THING
@@ -196,7 +199,7 @@
 ;; and initializes it.
 (define (new-thing adjectives location)
   (local [(define thing (make-thing (string->words adjectives)
-                                    '() location))]
+                                    '() location #f))]
     (begin (initialize-thing! thing)
            thing)))
 
@@ -222,14 +225,19 @@
   (define (go door)
     (begin
       (update-stats 2 2)
-      (if (xor (door-lockstatus door) (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory))))
+      (if (xor (door-lockstatus door)
+               (or (ormap (λ (x) (= 2 (keycard-access-level x))) (filter keycard? (my-inventory)))
+                   (ormap (λ (x) (not (eq? (memq (door-destination door) (keycard-privilege x)) #f))) (filter (λ (x) (= 1 (keycard-access-level x))) (filter keycard? (my-inventory))))))
         (display-line "This door seems to be locked.")
         (if (and (not (person-disguised? me)) (ormap (λ (x) (securitycam-status x)) (filter securitycam? (container-accessible-contents (door-destination door)))))
             (error "You got caught by security camera behind the door and you have been neutralized.")
-            (begin (move! me (door-destination door))
-                   (look)))))
+            (if (room-trap (door-destination door))
+                (error "You got caught by security guards inside the room and you have been neutralized.")
+                (begin (move! me (door-destination door))
+                       (look)))))
       )
     )
+  )
 
 
 ;; join: room string room string
@@ -311,11 +319,11 @@
 
 ;; new-prop: string container -> prop
 ;; Makes a new prop with the specified description.
-(define (new-prop description examine-text location)
+(define (new-prop description examine-text location bool)
   (local [(define words (string->words description))
           (define noun (last words))
           (define adjectives (drop-right words 1))
-          (define prop (make-prop adjectives '() location true noun examine-text))]
+          (define prop (make-prop adjectives '() location bool noun examine-text))]
     (begin (initialize-thing! prop)
            prop)))
 
@@ -333,7 +341,7 @@
    owner
    ;; access-level: integer number 0, 1, 2, 3
    ;; 0 = invalied (no access)
-   ;; 1 = student or faculty (limited access with certain privilege)
+   ;; 1 = partial access (limited access with certain privilege)
    ;; 2 = admin (full access)
    access-level
    ;; privilege: door
@@ -346,14 +354,14 @@
    ;; change examine to return keycard description.
    (define (examine keycard)
     (display-line (string-append
-     "A purple Wildcard with a picture and the name: "
+     "A purple access control card with a picture and the name: "
      (keycard-owner keycard))))
 )
 
-;; new-keycard: string, number, container, container -> keycard
+;; new-keycard: string, number, list of container, container -> keycard
 ;; Makes a new keycard with the specified parameters.
 (define (new-keycard owner access-level privilege location)
-  (local [(define adjs (string->words (string-append "wildcard with the name " owner)))
+  (local [(define adjs (string->words (string-append "access control card with the name " owner)))
           (define keycard (make-keycard adjs '() location #true owner access-level privilege))]
     (begin (initialize-thing! keycard)
            keycard)))
@@ -803,8 +811,8 @@
   (if (storage? (thing-location me))
       (begin
         (display-line (string-append "You closed the " (description (thing-location me))))
-        (look)
-        (move! me (thing-location (thing-location me))))
+        (move! me (thing-location (thing-location me)))
+        (look))
       (display-line "You haven't opened a storage object.")))
 
 (define-user-command (open storage)
@@ -870,66 +878,187 @@
 ;; Recreate the player object and all the rooms and things.
 (define (start-game)
   ;; Fill this in with the rooms you want
-  (local [(define dorm-room (new-room "dorm"))
-          (define dorm-hallway (new-room "hallway"))
-          (define office (new-room "office"))]
-    (begin (set! me (new-person "Willie the Wildcat" dorm-room))
+  (local [(define jail-cell (new-room "solitary confinement"))
+          (define jail-cell2 (new-room "holding cell 1"))
+          (define jail-cell3 (new-room "holding cell 2"))
+          (define jail-cell4 (new-room "holding cell 3"))
+          (define jail-cell5 (new-room "holding cell 4"))
+          (define jail-cell6 (new-room "holding cell 5"))
+          (define jail-cell7 (new-room "holding cell 6"))
+          (define jail-cell8 (new-room "holding cell 7"))
+          (define jail-cell9 (new-room "holding cell 8"))
+          (define cell-hallway (new-room "cell area hallway"))
+          (define common-lobby (new-room "common area lobby"))
+          (define cafeteria (new-room "cafeteria"))
+          (define kitchen (new-room "kitchen"))
+          (define visitation (new-room "visitation"))
+          (define courtyard (new-room "courtyard"))
+          (define storage (new-room "storage"))
+          (define common-restroom (new-room "cleaning cupboard"))
+          (define cleaning-cupboard (new-room "cleaning cupboard"))
+          (define admin-hallway (new-room "administrative hallway"))
+          (define admin-restroom (new-room "administrative restroom"))
+          (define parole-room (new-room "parole room"))
+          (define security (new-room "security"))
+          (define warden-office (new-room "warden’s office"))
+          (define fridge (new-storage "large fridge" kitchen false "This thing is huge!"))
+          (define pantry (new-storage "pantry" kitchen false "What’s in here?"))
+          (define desk (new-storage "desk with drawers" kitchen false "There’s a laptop on the desk. I wonder if there’s anything useful inside the desk?"))
+          (define closet (new-storage "closet" storage false "I wonder what’s in here? Could be worth checking out."))
+          (define cake (new-food "Birthday cake" warden-office "The cake is a lie" 20))
+          (define warden-desk (new-storage "warden desk" warden-office #f "Let’s see what the warden has in here."))
+          (define secretary-desk (new-storage "secretary desk" warden-office #f "Cool antique desk! It has a lot of compartments."))]
 
-           ;; Add join commands to connect your rooms with doors
-           (join! dorm-room "hallway"
-                  dorm-hallway "dorm" #t)
-           (join! dorm-hallway "office"
-                  office "hallway" #t)
+    (begin (set! me (new-person "Willie the Wildcat" jail-cell)) 
+           (set-room-trap! security #true)
+;; Add join commands to connect your rooms with doors
+           (join! jail-cell "hallway"
+                     cell-hallway "solitary confinement" #f)
+           (join! jail-cell2 "hallway"
+                   cell-hallway "#1 holding cell" #t)
+           (join! jail-cell3 "hallway"
+                   cell-hallway "#2 holding cell" #t)
+           (join! jail-cell4 "hallway"
+                   cell-hallway "#3 holding cell" #t)
+           (join! jail-cell5 "hallway"
+                   cell-hallway "#4 holding cell" #t)
+           (join! jail-cell6 "hallway"
+                   cell-hallway "#5 holding cell" #t)
+           (join! jail-cell7  "hallway"
+                   cell-hallway "#6 holding cell" #t)
+           (join! jail-cell8 "hallway"
+                   cell-hallway "#7 holding cell" #t)
+           (join! jail-cell9 "hallway"
+                   cell-hallway "#8 holding cell" #t)
+
+           (join! cell-hallway "lobby"
+            common-lobby "cell hallway" #f)
+           (join! common-lobby "cafeteria"
+                   cafeteria "lobby" #f)
+           (join! cafeteria "kitchen"
+                    kitchen "cafeteria" #f)
+           (join! common-lobby "visitation"
+                  visitation "lobby" #t)
+           (join! common-lobby "courtyard"
+                  courtyard "lobby" #f)
+
+           (join! common-lobby "storage"
+                 storage "lobby" #t)
+           (join! common-lobby "restroom"
+                  common-restroom "lobby" #f)
+           (join! common-lobby "cleaning cupboard"
+                  cleaning-cupboard "lobby" #f)
+
+           (join! common-lobby "admin hallway"
+                  admin-hallway "lobby" #t)
+           (join! admin-hallway "admin restroom"
+                  admin-restroom "admin hallway" #f)
+           (join! admin-hallway "parole room"
+                  parole-room "admin hallway" #t)
+           (join! admin-hallway "security"
+                  security "admin hallway" #t)
+           (join! admin-hallway "warden’s office"
+                  warden-office "admin-hallway" #t)
+                  
+ 
+
+                    
+
            ;; Add code here to add things to your rooms
+       
+    ;; Install the cameras
+           (new-securitycam "black" cell-hallway #f)
+           (new-securitycam "black" common-lobby #f)
+           (new-securitycam "black" cafeteria #f)
+           (new-securitycam "black" visitation #f)
+           (new-securitycam "black" courtyard #f)
+           (new-securitycam "black" admin-hallway #t)
+           (new-securitycam "black" parole-room #t)
+           (new-securitycam "black" warden-office #t)
+           (new-securitycam "black" security #t)
 
-           (new-food "apple" dorm-room "apple" 5)
-           (new-food "pie" dorm-room "pie" 20)
-           (new-storage "old treasure chest"                                                    
-                        dorm-room
-                        false
-                        "it is an old treasure chest, cool")
-           (new-food "ripe yellow banana"
-                     (the storage)
-                     "it is a ripe yellow banana"
-                     10)
+    ;; Install the power outlets
+            (new-poweroutlet "white" kitchen)
+            (new-poweroutlet "white" visitation)
+            (new-poweroutlet "white" cleaning-cupboard)
+            (new-poweroutlet "white" admin-hallway)
+            (new-poweroutlet "white" admin-restroom)
+            (new-poweroutlet "white" parole-room)
+            (new-poweroutlet "white" security)
+            (new-poweroutlet "white" warden-office)
+
+           (new-prop "Uncomfortable bed" "Might as well sleep on the floor." jail-cell #f)
+           (new-prop "dirty mirror" "A good cleaning wouldn’t hurt." jail-cell #f)
+
+           (new-food "chocolate chip cookies" jail-cell "chocolate chip cookies" 5)
+           (new-food "Cheez-its" jail-cell "These Cheez-its are looking pretty good" 5)
+           (new-beverage "water bottle" jail-cell "A plastic water bottle full of water" 5)
            
-           (new-beverage "cold glass of water"
-                         dorm-room
-                         "it is a cold glass of water"
-                         5)
            
-           (new-beverage "warm glass of water"
-                         dorm-room
-                         "a"
-                         8)
-
-           (new-beverage "zero suger catorade"
-                         dorm-room
-                         "a"
-                         20)
+           (new-food "apple" jail-cell "apple" 5)
+           (new-food "pie" jail-cell "pie" 20)
            
-           (new-disguise "fake moustache"
-                         dorm-room
-                         "it is a cool fake moustache"
-                         )
+           (new-beverage "milk carton" fridge "Haven’t had one of these in a while!" 5)
+           (new-food "granny smith apple" fridge "This is very sour." 5)
+           (new-food "cheese stick" fridge "Yum, pepper jack." 3)
+              (new-food "crackers" fridge "These are a good, basic snack." 3)
+           (new-food "cereal" fridge "This would be better with a bowl and milk, but whatever." 3)
+           (new-food "peanut butter" pantry "Never gets old..." 4)
+           (new-food "uncooked pasta" pantry "This doesn’t look good..." 1)
+           (new-food "sprinkles" pantry "Seriously?" 1)
 
-           (new-prop "large file"
-                     "What was this doing in an apple?"
-                     (the apple))
+           (new-prop "Long, rectangular tables" "There isn’t much to see here." cafeteria #f)
+           (new-prop "Long, rectangular benches" "There isn’t much to see here." cafeteria #f)
 
-           (new-holygrail "covidvax"
-                          office
-                          "vaccine for covid with micochip inside by Bill Gates")
+           (new-prop "three visitation sections: each made up of two wooden chairs, two corded telephones, and a window in the middle" "These look like pretty generic visitation tables." visitation #f)
+
+    
+
+            
+            (new-disguise "guard’s uniform" closet "What a convenient thing to find!")
+
+            (new-prop "some guys lifting weights" "They sure look like they are having fun!" courtyard #f)
+            (new-prop "broken tetherball pole" ":(" courtyard #f)
+            (new-prop "prisoner selling contraband" "What’s he selling?" courtyard #f)
+
+            (new-prop "mop" "This doesn’t seem incredibly useful." cleaning-cupboard #t) 
+            (new-prop "mop bucket" "This doesn’t seem incredibly useful." cleaning-cupboard #t)
+            (new-prop "broom" "Neat." cleaning-cupboard #t)
+    
+            (new-prop "sink" "It is a sink." common-restroom #f)
+            (new-prop "mirror" "It’s cleaner than the one in the cell." common-restroom #f)
+            (new-prop "toilet stall" "It’s a toilet stall." common-restroom #f)
+
+            (new-prop "nondescript brown boxes" "These look boring." storage #f)
+            (new-prop "laundry basket" "Cool?" storage #f)
+    
+            (new-prop "two sinks" "They are two sinks." admin-restroom #f)
+            (new-prop "two mirrors" "They are two mirrors." admin-restroom #f)
+            (new-prop "two toilet stalls" "They are two toilet stalls." admin-restroom #f)
+
+            (new-prop "tax evasion documents" "I guess the cake really was a lie..." cake #t) 
+            (new-prop "table with a birthday cake on it" "Nice table." warden-office #f)
+            (new-prop "ballpoint pen" "This is oddly fancy for a pen." warden-desk #t)
+            (new-prop "generic documents" "This isn’t really a surprise." warden-desk #t)
+            (new-prop "pack of gum" "Spearmint, good choice." warden-desk #t)
+            (new-prop "computer" "How did he get a 3080 so fast?" warden-office #f)
+            (new-prop "computer monitor" "240Hz. Looks pretty nice." warden-office #f)
+            (new-holygrail "Warden’s Keycard" secretary-desk "A access control card with a name Mortimer S. Schapiro.")
+
            
+           ;; Keycards In the Game
+            (new-keycard "Janitor Rick Sanchez" 1 (list visitation storage admin-hallway parole-room) cleaning-cupboard)
+            (new-keycard "US Attorney Rudy Giuliani" 2 '() parole-room)
+            (new-keycard "Inmate Willie the Wildcat" 0 '() me)
 
-           (new-keycard "Mortimer S. Schapiro" 2 dorm-hallway dorm-room)
-           (new-keycard "Willie the Wildcat" 1 dorm-hallway me)
-           (new-laptop "silver Banana Pro" dorm-room 1)
-           (new-securitycam "black" dorm-hallway #t)
-           (new-laptopcharger "black" dorm-room)
-           (new-poweroutlet "white" dorm-room)
+            ;; Laptop related
+           (new-laptop "silver Banana Pro" kitchen 1)
+           (new-laptopcharger "black" desk)
+
            (check-containers!)
            (void))))
+
+
 
 ;;;
 ;;; PUT YOUR WALKTHROUGHS HERE
@@ -953,6 +1082,60 @@
 ;;; UTILITIES
 ;;;
 
+;; loadingscreen:
+;; Display a good looking loading screen. Because why not?
+(define (loadingscreen)
+  ;; Intro
+  (begin
+           (display-line "You are a computer science genius studying at Northwestern.")
+           (sleep 3)
+           (display-line "You hacked into the U.S. Bank ATM system for some quick cash because MOD Pizza is too expensive and you couldn’t afford it.")
+           (sleep 3)
+           (display-line "Unfortunately, you got caught by Ian. He had to turn you in; now you're in jail.")
+           (sleep 3)
+           (display-line "Your mission, should you choose to accept it, is to break out of jail.")
+           (sleep 3)
+           (newline)
+           (display-line "█ █▄░█ █ ▀█▀ █ ▄▀█ █░░ █ ▀█ █ █▄░█ █▀▀   █▀▀ ▄▀█ █▀▄▀█ █▀▀   █▀▀ █▄░█ █▀▀ █ █▄░█ █▀▀")
+           (display-line "█ █░▀█ █ ░█░ █ █▀█ █▄▄ █ █▄ █ █░▀█ █▄█   █▄█ █▀█ █░▀░█ ██▄   ██▄ █░▀█ █▄█ █ █░▀█ ██▄")
+           (newline)
+           (display-line "AMIBIOS (C) 1989-1994 American Megatrends, Inc.")
+           (sleep 0.3)
+           (display-line "CPU : Texas Instruments Ti486dx2-66")
+           (sleep 0.3)
+           (display-line "   Speed: 66 MHz Count : 1")
+           (sleep 1)
+           (display-line "Connected at 115200 bps...")
+           (sleep 0.5)
+           (display-line "Logging on to Zoom University....")
+           (sleep 2)
+           (display-line "Hacking Canvas Scores.....")
+           (display-line "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWWWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMWX00KWMMMMMMMWKKKKKKKWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMN0xolOWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMWOc,;oKWMMMMMNOdc;cdONMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWWMMMMMN0l',kWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMWKc.':xNMMMMMMWk;dWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMXddXMMMMMWO,,kWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMW0okWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMXl;:,'lOWMMMMWk:xWMMMWNKOOOOKNWMMMMNX0KWWKOOXWNXx,:k00O0WWO;,kWX0OkOKWMMNK000KNWX00000XWWX000KNMMNKOkO0XWMMMMNKOOOO0XWWXKl'lO00OKMMWNKOkO0XWMMMWX00NWKOOXWWNK0XWX0Ok0KWMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMXlc0Oc',oKWMMWk;xWMWKdldkkkdccdKWWKd;,ckdc;:ONOd;',lolo0WWO;,okxdl:,;oKWXd;,ckNWKl,;okKWWKd:lOXXxodxkxlcdXMW0lokOkl;dNXkl,';loldXMXxldkkxocdXWXd:,cxdc;;kXOc,,okxdl:,;dXMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMXlcKWXx;':xNMWk;xWW0:;xNMMMWKl':OWW0c';x0XKKNMWXo'cKWWWWMMO;,dXWWWXx;'dNMXo':0MMWk,'o0XMMNxoKWKl;xNWWW0:'xNNo,oKWMXxOWMWKc'dNWWWWKl;xNWWW0:'dNWKl';d0XXKXWNd,,dXWWWXd,,kWMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMXlcKMMWKo,'cONk;xWXl'cKMMMMMM0:.lXMNd'lXMMMMMMMNd'lXMMMMMMO;,kWMMMMXl'oNMM0:'oXMXd:,,ckWWOo0WNd';dOOkkdccxNWk;';lx0XWMMMKc'dNMMMWx';dOOOkdc:xNMWx':KMMMMMMM0;,kWMMMMK:'xWMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMXlcKMMMMNOc',oo;xWKc.cKMMMMMMKc.lXMNd'lXMMMMMMMNo'lXMMMMMMO;,kWMMMMXl'oNMMWx,;kXxd0o'.:00okWMNo':ONNNNNNNWMMWKxl;,,ckNMMKc'dWMMMNo';ONNNNNNNWMMWx'cKMMMMMMM0;,kWMMMMK:'xWMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMXlcKMMMMMWXx;'',xWNd';kWMMMMWO;,xWMNd'lXMMMMMMMNo'lXMMMMMMO;,kWMMMMXl'oNMMMXo'codKWKc.'cldXMMWk,'oXWMMMMMMMN0XWWXOl';OMMK:'dWMMMWk,'oXMMMMMMMMMWx'cKMMMMMMM0;,kWMMMMK:'xWMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMWN0c:kXWMMMMMWKo,'xWMXd;;xKNNXOcckNMWXo':ONWMMMMMWx,;d0KKXWNk,'dXWMMW0c.c0NWMW0:'c0WMWOl;'cKMMMMNx;':dkOOOOKWKccONWNx;c0MMXl':kKKKNNx;':dO0OOkKWWXo':ONWMMMMNk;'dXWMMWO;'oKWMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMXkdoldkKWMMMMMMNOoOWMMWKxoodxxxOXWMWXkoloxONMMMMMMXxccoxOXN0dolokKWWKxolox0NMMNko0WMMMNXkoOWMMMMMWKxocclox0NMNOooxkxdxKWMMWKoccox0NMWKxoccloxONWXOdlodOXMMMN0xolokKWW0xoloxKWMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMWWWWWWMMMMMMMMMMWWMMMMMMWWNNWMMMMMMMWWWWWWMMMMMMMMMWWWWMMMWWWWWWMMMMWWWWWWMMMMWWMMMMMMMMWMMMMMMMMMMWWWWWMMMMMMWWNNWWMMMMMMMWWWWMMMMMMMWWWWWMMMMMWWWWWWMMMMMWWWWWWMMMMWWWWWMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (display-line "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+           (sleep 10)
+           (newline)
+           (display-line "Your daily free time has just begun. Your cell door is unlocked.")
+           (sleep 1)
+           (display-line "Good Luck!")
+           (sleep 5))
+  )
+  
 ;; bargraph: number -> void:
 ;; Outputs a string as a hunger/thirst bar.
 (define (bargraph value)
