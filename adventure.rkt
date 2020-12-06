@@ -990,7 +990,7 @@
            (new-prop "Uncomfortable bed" "Might as well sleep on the floor." jail-cell #f)
            (new-prop "dirty mirror" "A good cleaning wouldn’t hurt." jail-cell #f)
 
-           (new-food "chocolate chip cookies" jail-cell "chocolate chip cookies" 8)
+           (new-food "chocolate chip cookie" jail-cell "chocolate chip cookie" 8)
            (new-food "Cheez-its" jail-cell "These Cheez-its are looking pretty good" 8)
            (new-beverage "water bottle" jail-cell "A plastic water bottle full of water" 8)
            
@@ -1009,9 +1009,9 @@
 
            (new-prop "Long, rectangular tables" "There isn’t much to see here." cafeteria #f)
            (new-prop "Long, rectangular benches" "There isn’t much to see here." cafeteria #f)
-           (new-food "chicken tenders" cafeteria "Yum!" 10)
+           (new-food "box of chicken tenders" cafeteria "Yum!" 10)
            (new-food "Banana" cafeteria "Perfectly ripe." 6)
-           (new-food "Potato chips" cafeteria "Original flavor" 6)
+           (new-food "Bag of potato chips" cafeteria "Original flavor" 6)
            (new-food "cup of yogurt" cafeteria "Strawberry flavor" 6)
            (new-beverage "water bottle" cafeteria "Looks pretty good." 10)
            (new-beverage "orange juice carton" cafeteria "It isn't breakfast!" 10)
@@ -1055,7 +1055,7 @@
 
            
            ;; Keycards In the Game
-            (new-keycard "Janitor Rick Sanchez" 1 (list visitation stowage admin-hallway parole-room) cleaning-cupboard)
+            (new-keycard "Janitor Rick Sanchez" 1 (list visitation stowage admin-hallway parole-room common-lobby) cleaning-cupboard)
             (new-keycard "US Attorney Rudy Giuliani" 2 '() parole-room)
             (new-keycard "Inmate Willie the Wildcat" 0 '() me)
 
