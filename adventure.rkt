@@ -1118,7 +1118,7 @@
 ;;;
 ;;; PUT YOUR WALKTHROUGHS HERE
 ;;;
-(define-walkthrough walkthrough
+(define-walkthrough win
   (take (the pie))
   (take (the water))
   (take (the chocolate chip cookie))
