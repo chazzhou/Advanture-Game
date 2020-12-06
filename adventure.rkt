@@ -1214,7 +1214,7 @@
 (define (N) (endcredit))
 
 ;; endcredit:
-;; Displays a awesome end credit.
+;; Displays an awesome end credit.
 (define (endcredit)
   (begin (newline)
          (display-line "Adventure Game for CS111 - Fall 2020")
