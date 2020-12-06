@@ -893,7 +893,7 @@
           (define kitchen (new-room "kitchen"))
           (define visitation (new-room "visitation"))
           (define courtyard (new-room "courtyard"))
-          (define storage (new-room "storage"))
+          (define stowage (new-room "stowage"))
           (define common-restroom (new-room "cleaning cupboard"))
           (define cleaning-cupboard (new-room "cleaning cupboard"))
           (define admin-hallway (new-room "administrative hallway"))
@@ -903,8 +903,8 @@
           (define warden-office (new-room "warden’s office"))
           (define fridge (new-storage "large fridge" kitchen false "This thing is huge!"))
           (define pantry (new-storage "pantry" kitchen false "What’s in here?"))
-          (define desk (new-storage "desk with drawers" kitchen false "There’s a laptop on the desk. I wonder if there’s anything useful inside the desk?"))
-          (define closet (new-storage "closet" storage false "I wonder what’s in here? Could be worth checking out."))
+          (define desk (new-storage "desk with drawers" stowage false "There’s a laptop on the desk. I wonder if there’s anything useful inside the desk?"))
+          (define closet (new-storage "closet" stowage false "I wonder what’s in here? Could be worth checking out."))
           (define cake (new-food "Birthday cake" warden-office "The cake is a lie" 20))
           (define warden-desk (new-storage "warden desk" warden-office #f "Let’s see what the warden has in here."))
           (define secretary-desk (new-storage "secretary desk" warden-office #f "Cool antique desk! It has a lot of compartments."))]
@@ -942,8 +942,8 @@
            (join! common-lobby "courtyard"
                   courtyard "lobby" #f)
 
-           (join! common-lobby "storage"
-                 storage "lobby" #t)
+           (join! common-lobby "stowage"
+                 stowage "lobby" #t)
            (join! common-lobby "restroom"
                   common-restroom "lobby" #f)
            (join! common-lobby "cleaning cupboard"
@@ -990,25 +990,33 @@
            (new-prop "Uncomfortable bed" "Might as well sleep on the floor." jail-cell #f)
            (new-prop "dirty mirror" "A good cleaning wouldn’t hurt." jail-cell #f)
 
-           (new-food "chocolate chip cookies" jail-cell "chocolate chip cookies" 5)
-           (new-food "Cheez-its" jail-cell "These Cheez-its are looking pretty good" 5)
-           (new-beverage "water bottle" jail-cell "A plastic water bottle full of water" 5)
+           (new-food "chocolate chip cookies" jail-cell "chocolate chip cookies" 8)
+           (new-food "Cheez-its" jail-cell "These Cheez-its are looking pretty good" 8)
+           (new-beverage "water bottle" jail-cell "A plastic water bottle full of water" 8)
            
            
            (new-food "apple" jail-cell "apple" 5)
            (new-food "pie" jail-cell "pie" 20)
            
-           (new-beverage "milk carton" fridge "Haven’t had one of these in a while!" 5)
-           (new-food "granny smith apple" fridge "This is very sour." 5)
-           (new-food "cheese stick" fridge "Yum, pepper jack." 3)
-              (new-food "crackers" fridge "These are a good, basic snack." 3)
-           (new-food "cereal" fridge "This would be better with a bowl and milk, but whatever." 3)
-           (new-food "peanut butter" pantry "Never gets old..." 4)
+           (new-beverage "milk carton" fridge "Haven’t had one of these in a while!" 10)
+           (new-food "granny smith apple" fridge "This is very sour." 6)
+           (new-food "cheese stick" fridge "Yum, pepper jack." 4)
+              (new-food "crackers" fridge "These are a good, basic snack." 6)
+           (new-food "cereal" fridge "This would be better with a bowl and milk, but whatever." 5)
+           (new-food "peanut butter" pantry "Never gets old..." 6)
            (new-food "uncooked pasta" pantry "This doesn’t look good..." 1)
-           (new-food "sprinkles" pantry "Seriously?" 1)
+           (new-food "sprinkles" pantry "Seriously?" 2)
 
            (new-prop "Long, rectangular tables" "There isn’t much to see here." cafeteria #f)
            (new-prop "Long, rectangular benches" "There isn’t much to see here." cafeteria #f)
+           (new-food "chicken tenders" cafeteria "Yum!" 10)
+           (new-food "Banana" cafeteria "Perfectly ripe." 6)
+           (new-food "Potato chips" cafeteria "Original flavor" 6)
+           (new-food "cup of yogurt" cafeteria "Strawberry flavor" 6)
+           (new-beverage "water bottle" cafeteria "Looks pretty good." 10)
+           (new-beverage "orange juice carton" cafeteria "It isn't breakfast!" 10)
+           (new-beverage "apple juice" cafeteria "It's always good" 10)
+           (new-beverage "chocolate milk carton" cafeteria "10/10 drink" 10)
 
            (new-prop "three visitation sections: each made up of two wooden chairs, two corded telephones, and a window in the middle" "These look like pretty generic visitation tables." visitation #f)
 
@@ -1017,7 +1025,7 @@
             
             (new-disguise "guard’s uniform" closet "What a convenient thing to find!")
 
-            (new-prop "some guys lifting weights" "They sure look like they are having fun!" courtyard #f)
+            (new-prop "a guy lifting weights" "He sure looks like he's having fun!" courtyard #f)
             (new-prop "broken tetherball pole" ":(" courtyard #f)
             (new-prop "prisoner selling contraband" "What’s he selling?" courtyard #f)
 
@@ -1029,8 +1037,8 @@
             (new-prop "mirror" "It’s cleaner than the one in the cell." common-restroom #f)
             (new-prop "toilet stall" "It’s a toilet stall." common-restroom #f)
 
-            (new-prop "nondescript brown boxes" "These look boring." storage #f)
-            (new-prop "laundry basket" "Cool?" storage #f)
+            (new-prop "nondescript brown boxes" "These look boring." stowage #f)
+            (new-prop "laundry basket" "Cool?" stowage #f)
     
             (new-prop "two sinks" "They are two sinks." admin-restroom #f)
             (new-prop "two mirrors" "They are two mirrors." admin-restroom #f)
@@ -1047,12 +1055,12 @@
 
            
            ;; Keycards In the Game
-            (new-keycard "Janitor Rick Sanchez" 1 (list visitation storage admin-hallway parole-room) cleaning-cupboard)
+            (new-keycard "Janitor Rick Sanchez" 1 (list visitation stowage admin-hallway parole-room) cleaning-cupboard)
             (new-keycard "US Attorney Rudy Giuliani" 2 '() parole-room)
             (new-keycard "Inmate Willie the Wildcat" 0 '() me)
 
             ;; Laptop related
-           (new-laptop "silver Banana Pro" kitchen 1)
+           (new-laptop "silver Banana Pro" stowage 1)
            (new-laptopcharger "black" desk)
 
            (check-containers!)
