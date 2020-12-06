@@ -574,7 +574,9 @@
 
   #:methods
   (define (take x)
-    (begin (newline)
+    (local [(define cuba (new-room "cuba"))]
+    (begin (move! me cuba)
+           (newline)
            (display-line"Congrats!")
            (sleep 1)
            (display "It took you ")
@@ -594,7 +596,7 @@
            (sleep 6)
            (display-line "Oof. At least you beat the game! Congratulations and Enjoy your break.")
            (sleep 10)
-           (endcredit))))
+           (endcredit)))))
 
 ;; new-holygrail string, container, string -> holygrail
 ;; Makes a new disguise object with the specified parameters.
