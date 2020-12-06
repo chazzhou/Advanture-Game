@@ -876,6 +876,7 @@
 (define-user-command (wear disguise)
   "Takes a disguise object if the player hasn't already, and disguises the player")
 
+;; Get rid of the disguise. Updates disguised? status.
 (define (remove-disguise)
   (if (person-disguised? me)
       (begin
