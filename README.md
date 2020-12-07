@@ -8,7 +8,7 @@ Our text adventure game takes place in a prison. There's more details given when
 
 You will need to take, eat, and drink food and drinks to survive as your hunger and thirst go down.
 
-# There are a few types you will need to know how to use. 
+## There are a few types you will need to know how to use. 
 
 ### Storage
 Some objects are a subtype of prop called storage. They can hold other objects inside. Open them with (open (the name)) and
