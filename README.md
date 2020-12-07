@@ -3,10 +3,12 @@
  
 By Sean Carlson and Charles Zhou
 
+# Game Mechanics
 Our text adventure game takes place in a prison. There's more details given when you start the game, but your goal is to escape. 
 
 You will need to take, eat, and drink food and drinks to survive as your hunger and thirst go down.
 
+# Tips
 
 There are a few types you will need to know how to use. 
 
