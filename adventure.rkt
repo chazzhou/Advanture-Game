@@ -430,7 +430,7 @@
           (display-line (string-append "¿¿ Wow! there's " (description (first (container-contents food))) " in here! ??"))
           (display-line (string-append "You found " (description (first (container-contents food))) " inside " (description food) " and it's now in your inventory."))
           (move! (first (container-contents food)) me)
-          (display-line "Unfortunately you can't really eat it. Your hunger level stays the same."))
+          (display-line "Unfortunately you lost your appetite. Your hunger level stays the same."))
         (if (= (person-hunger me) 20)
             (begin (display-line "You are too full to eat this.")
                    (check-hunger))
@@ -802,7 +802,8 @@
     (display "/20 | ")
     (bargraph (person-hunger me))
     (unless (> (person-hunger me) 0)
-      (display-line "⚠ Your stomach is empty and you are dying because of hunger."))
+      (begin (display-line "⚠ Your stomach is empty and you are dying because of hunger.")
+             (display-line "¿?Game Tip: Use (eat (the food)) to eat substances.")))
   )
 )
 
@@ -817,7 +818,8 @@
     (display "/20 | ")
     (bargraph (person-thirst me))
     (unless (> (person-thirst me) 0)
-      (display-line "⚠ You are dying due to lack of hydration."))
+      (begin (display-line "⚠ You are dying due to lack of hydration.")
+             (display-line "¿?Game Tip: Use (drink (the beverage)) to drink some liquid.")))
   )
 )
 
@@ -831,6 +833,8 @@
     (display (person-hp me))
     (display "/20 | ")
     (bargraph (person-hp me))
+    (unless (= (person-hp me) 20)
+      (display-line "¿?Game Tip: Eat and drink enough and then your body will restore."))
   )
 )
 
@@ -913,7 +917,8 @@
                  (mystatus)
                  )
           (display-line "You are not sure how to hack that."))
-      (display-line "You tried but your laptop doesn't have enough battery."))
+      (begin (display-line "You tried but your laptop doesn't have enough battery.")
+             (display-line "¿?Game Tip: Use (charge (the laptop)) to charge your laptop.")))
       (display-line "You don't have a a device that you can use to hack things with."))
   )
 
@@ -1090,7 +1095,7 @@
            (new-beverage "catorade" parole-room "A famous sports drink." 20)
            (new-beverage "nerds" parole-room "The candy, nerds." 5)
            
-           (new-prop "Donald's tax returns" "I guess the cake really was a lie..." cake #t) 
+           (new-prop "Donald's tax return" "I guess the cake really was a lie..." cake #t) 
            (new-prop "table with a chocolate fungecake on it" "Nice table." warden-office #f)
            (new-prop "ballpoint pen" "This is oddly fancy for a pen." warden-desk #t)
            (new-prop "generic documents" "This isn’t really a surprise." warden-desk #t)
